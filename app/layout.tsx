@@ -1,12 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import './globals.css';
-import { Rubik } from 'next/font/google';
-
-const rubik = Rubik({ 
-  subsets: ['hebrew', 'latin'],
-  variable: '--font-rubik', 
-});
 
 export const metadata: Metadata = {
   title: 'SmartRisk - ניהול סיכונים חכם לעסקים',
@@ -20,7 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="he" dir="rtl">
-      <body className={`${rubik.variable} font-sans`}>
+      <body className="font-sans">
         {children}
       </body>
     </html>

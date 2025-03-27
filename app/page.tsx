@@ -39,12 +39,17 @@ export default function Home() {
             </div>
             <div className="md:w-1/2">
               <div className="relative">
-                <div className="bg-white p-2 rounded-xl shadow-2xl">
-                  <img 
-                    src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80" 
-                    alt="SmartRisk Dashboard" 
-                    className="rounded-lg w-full"
-                  />
+                <div className="bg-white p-6 rounded-xl shadow-2xl text-gray-900">
+                  <div className="h-[300px] flex flex-col items-center justify-center">
+                    <div className="text-5xl text-primary-600 mb-4">SmartRisk</div>
+                    <div className="text-xl mb-3">ניתוח מבוסס AI</div>
+                    <div className="flex items-center justify-center space-x-4 space-x-reverse">
+                      <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                      <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
+                      <div className="h-3 w-3 rounded-full bg-red-500"></div>
+                    </div>
+                    <div className="mt-8 text-sm">דמו של מערכת ניהול סיכונים</div>
+                  </div>
                 </div>
                 <div className="absolute -bottom-5 -left-5 bg-secondary-500 text-white p-4 rounded-lg shadow-lg">
                   <p className="font-bold">100% מבוסס AI</p>
