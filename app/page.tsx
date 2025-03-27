@@ -2,9 +2,16 @@ import React from 'react';
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <h1 className="text-4xl font-bold mb-4">Welcome to SmartRisk</h1>
-      <p className="text-xl">Your risk management solution</p>
+    <main style={{
+      display: 'flex',
+      minHeight: '100vh',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '24px'
+    }}>
+      <h1 style={{ fontSize: '2.25rem', fontWeight: 'bold', marginBottom: '1rem' }}>Welcome to SmartRisk</h1>
+      <p style={{ fontSize: '1.25rem' }}>Your risk management solution</p>
     </main>
   );
 } 
