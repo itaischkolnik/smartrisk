@@ -1,44 +1,101 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth/auth-options';
+import { cookies } from 'next/headers';
 
 export async function GET(
-  req: NextRequest,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    // Check authentication
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user || !session.user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const assessmentId = params.id;
-    if (!assessmentId) {
-      return NextResponse.json({ error: 'Assessment ID is required' }, { status: 400 });
-    }
-
-    // Initialize Supabase Admin Client
     const supabase = createServerSupabaseClient();
+    
+    // Check if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
 
-    // Get files for this assessment
+    const userId = session.user.id;
+    const assessmentId = params.id;
+
+    // Fetch files for the assessment
     const { data: files, error } = await supabase
-      .from('files')
-      .select('*')
-      .eq('assessment_id', assessmentId)
-      .order('created_at', { ascending: false });
+      .storage
+      .from('assessment-files')
+      .list(`${userId}/${assessmentId}`);
 
     if (error) {
       console.error('Error fetching files:', error);
-      return NextResponse.json({ error: 'Failed to fetch files' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to fetch files' },
+        { status: 500 }
+      );
     }
 
-    return NextResponse.json({ files: files || [] });
-
+    return NextResponse.json(files);
   } catch (error) {
-    console.error('Error fetching files:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error in files GET route:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const supabase = createServerSupabaseClient();
+    
+    // Check if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
+    const assessmentId = params.id;
+
+    // Get the file data from the request
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+
+    if (!file) {
+      return NextResponse.json(
+        { error: 'No file provided' },
+        { status: 400 }
+      );
+    }
+
+    // Upload the file
+    const { data, error } = await supabase
+      .storage
+      .from('assessment-files')
+      .upload(`${userId}/${assessmentId}/${file.name}`, file);
+
+    if (error) {
+      console.error('Error uploading file:', error);
+      return NextResponse.json(
+        { error: 'Failed to upload file' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Error in file upload:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 

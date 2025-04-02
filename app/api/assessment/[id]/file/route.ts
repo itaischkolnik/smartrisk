@@ -1,28 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth/auth-options';
+import { cookies } from 'next/headers';
 
 function sanitizeFileName(fileName: string): string {
   // Remove any path components
-  const name = fileName.split(/[\\/]/).pop() || fileName;
-  
-  // Transliterate non-ASCII characters to their ASCII equivalents
-  const transliterated = name
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    // Replace Hebrew characters with their English transliteration
-    .replace(/[א-ת]/g, '_')
-    // Replace any remaining non-ASCII characters with underscores
-    .replace(/[^\x00-\x7F]/g, '_')
-    // Replace spaces and special characters with underscores
-    .replace(/[^a-zA-Z0-9.-]/g, '_')
-    // Replace multiple consecutive underscores with a single one
-    .replace(/_+/g, '_')
-    // Remove leading/trailing underscores
-    .replace(/^_+|_+$/g, '');
-
-  return transliterated;
+  const name = fileName.split(/[\\/]/).pop() || '';
+  // Remove any non-alphanumeric characters except dots and dashes
+  return name.replace(/[^a-zA-Z0-9.-]/g, '_');
 }
 
 export async function POST(
@@ -30,44 +14,22 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Check authentication
-    const session = await getServerSession(authOptions);
-    console.log('Session:', session);
+    const supabase = createServerSupabaseClient();
     
-    if (!session || !session.user || !session.user.id) {
-      console.log('Unauthorized - no valid session');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Check if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
+    const userId = session.user.id;
     const assessmentId = params.id;
-    console.log('Assessment ID:', assessmentId);
-    console.log('User ID:', session.user.id);
-    
+
     if (!assessmentId) {
       return NextResponse.json({ error: 'Assessment ID is required' }, { status: 400 });
-    }
-
-    // Initialize Supabase Admin Client
-    const supabase = createServerSupabaseClient();
-
-    // Check if assessment exists and belongs to the user
-    const { data: assessment, error: assessmentError } = await supabase
-      .from('assessments')
-      .select('id')
-      .eq('id', assessmentId)
-      .single();
-
-    console.log('Assessment query result:', { assessment, error: assessmentError });
-
-    if (assessmentError || !assessment) {
-      console.error('Error finding assessment:', assessmentError);
-      return NextResponse.json({ 
-        error: 'Assessment not found',
-        details: {
-          assessmentId,
-          queryError: assessmentError
-        }
-      }, { status: 404 });
     }
 
     // Process the file upload
@@ -88,7 +50,7 @@ export async function POST(
     // Generate a unique filename with sanitization
     const timestamp = Date.now();
     const sanitizedFileName = sanitizeFileName(file.name);
-    const filename = `${assessmentId}/${timestamp}_${sanitizedFileName}`;
+    const filename = `${userId}/${assessmentId}/${timestamp}_${sanitizedFileName}`;
 
     console.log('Attempting to upload file:', {
       bucket: 'assessment-files',
@@ -163,5 +125,119 @@ export async function POST(
   } catch (error) {
     console.error('Error uploading file:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const supabase = createServerSupabaseClient();
+    
+    // Check if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
+    const assessmentId = params.id;
+
+    // Get the filename from the URL
+    const url = new URL(request.url);
+    const fileName = url.searchParams.get('fileName');
+
+    if (!fileName) {
+      return NextResponse.json(
+        { error: 'File name is required' },
+        { status: 400 }
+      );
+    }
+
+    const sanitizedFileName = sanitizeFileName(fileName);
+    const filePath = `${userId}/${assessmentId}/${sanitizedFileName}`;
+
+    // Get file download URL
+    const { data, error } = await supabase
+      .storage
+      .from('assessment-files')
+      .createSignedUrl(filePath, 60); // URL valid for 60 seconds
+
+    if (error) {
+      console.error('Error getting file URL:', error);
+      return NextResponse.json(
+        { error: 'Failed to get file URL' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ url: data.signedUrl });
+  } catch (error) {
+    console.error('Error in file GET route:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const supabase = createServerSupabaseClient();
+    
+    // Check if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
+    const assessmentId = params.id;
+
+    // Get the filename from the URL
+    const url = new URL(request.url);
+    const fileName = url.searchParams.get('fileName');
+
+    if (!fileName) {
+      return NextResponse.json(
+        { error: 'File name is required' },
+        { status: 400 }
+      );
+    }
+
+    const sanitizedFileName = sanitizeFileName(fileName);
+    const filePath = `${userId}/${assessmentId}/${sanitizedFileName}`;
+
+    // Delete the file
+    const { error } = await supabase
+      .storage
+      .from('assessment-files')
+      .remove([filePath]);
+
+    if (error) {
+      console.error('Error deleting file:', error);
+      return NextResponse.json(
+        { error: 'Failed to delete file' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error in file DELETE route:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 } 
