@@ -4,9 +4,27 @@ import React from 'react';
 import { useFormContext } from 'react-hook-form';
 import { FiAlertCircle } from 'react-icons/fi';
 
+interface FormInputs {
+  business_name: string;
+  business_type: string;
+  industry: string;
+  establishment_date: string;
+  employee_count: number;
+  business_structure: string;
+  business_location: string;
+  operating_hours: string;
+  property_details: string;
+  sale_reason: string;
+  legal_issues: string;
+  additional_notes: string;
+}
+
 const BusinessDetailsForm: React.FC = () => {
-  const { register, formState: { errors } } = useFormContext();
-  
+  const {
+    register,
+    formState: { errors },
+  } = useFormContext<FormInputs>();
+
   return (
     <div className="space-y-6">
       <div>
@@ -29,7 +47,7 @@ const BusinessDetailsForm: React.FC = () => {
               {...register('business_name')}
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
-            {errors.business_name && (
+            {errors.business_name?.message && (
               <p className="mt-1 text-sm text-red-600 flex items-center">
                 <FiAlertCircle className="ml-1" />
                 {errors.business_name.message}
@@ -54,7 +72,7 @@ const BusinessDetailsForm: React.FC = () => {
               <option value="tech">טכנולוגיה</option>
               <option value="other">אחר</option>
             </select>
-            {errors.business_type && (
+            {errors.business_type?.message && (
               <p className="mt-1 text-sm text-red-600 flex items-center">
                 <FiAlertCircle className="ml-1" />
                 {errors.business_type.message}
