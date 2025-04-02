@@ -104,19 +104,21 @@ export async function DELETE(
   { params }: { params: { id: string; fileId: string } }
 ) {
   try {
-    // Check authentication
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user || !session.user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const supabase = createServerSupabaseClient();
+    
+    // Check if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
     const { id: assessmentId, fileId } = params;
     if (!assessmentId || !fileId) {
       return NextResponse.json({ error: 'Assessment ID and File ID are required' }, { status: 400 });
     }
-
-    // Initialize Supabase Admin Client
-    const supabase = createServerSupabaseClient();
 
     // Get file info first
     const { data: file, error: fileError } = await supabase
