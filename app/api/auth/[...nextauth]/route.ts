@@ -1,7 +1,7 @@
 import { NextAuthOptions } from 'next-auth';
 import NextAuth from 'next-auth/next';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { authOptions } from '@/app/lib/auth/auth-options';
+import { authOptions } from '@/lib/auth/auth-options';
 
 declare module 'next-auth' {
   interface Session {
