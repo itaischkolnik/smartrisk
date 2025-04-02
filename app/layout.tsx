@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Heebo } from "next/font/google";
 import "./globals.css";
+import { AuthClientProvider } from "./contexts/AuthClientContext";
 
-const inter = Inter({ subsets: ["latin"] });
+const heebo = Heebo({ subsets: ["hebrew", "latin"] });
 
 export const metadata: Metadata = {
-  title: "SmartRisk - ניהול סיכונים חכם לעסקים",
-  description: "פלטפורמה מבוססת AI לניתוח והערכת סיכונים וכדאיות של רכישת עסק",
+  title: "SmartRisk - הערכת סיכונים חכמה לעסקים",
+  description: "מערכת מבוססת AI לניתוח והערכת סיכונים לעסקים",
 };
 
 export default function RootLayout({
@@ -16,7 +17,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="he" dir="rtl">
-      <body className={inter.className}>{children}</body>
+      <body className={heebo.className}>
+        <AuthClientProvider>
+          {children}
+        </AuthClientProvider>
+      </body>
     </html>
   );
 } 
