@@ -1,6 +1,14 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-export const supabase = createClientComponentClient();
+export const supabase = createClientComponentClient({
+  auth: {
+    flowType: 'pkce',
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    persistSession: true,
+    site: 'https://smartrisk.co.il'
+  }
+});
 
 export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({

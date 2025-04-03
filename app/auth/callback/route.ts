@@ -11,13 +11,6 @@ export async function GET(request: Request) {
     await supabase.auth.exchangeCodeForSession(code);
   }
 
-  // Get the host from the request URL
-  const host = requestUrl.host;
-  const protocol = host.includes('localhost') ? 'http' : 'https';
-  
-  // Construct the redirect URL using the same host
-  const redirectTo = new URL('/dashboard', `${protocol}://${host}`);
-  
-  // Redirect to dashboard
-  return NextResponse.redirect(redirectTo);
+  // Always redirect to the dashboard on the production domain
+  return NextResponse.redirect(new URL('/dashboard', 'https://smartrisk.co.il'));
 } 
