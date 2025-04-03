@@ -1,20 +1,16 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-export const supabase = createClientComponentClient({
-  auth: {
-    flowType: 'pkce',
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    persistSession: true,
-    site: 'https://smartrisk.co.il'
-  }
-});
+export const supabase = createClientComponentClient();
 
 export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}/auth/callback`
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+      },
+      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/callback`
     }
   });
 
