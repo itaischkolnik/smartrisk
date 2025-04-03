@@ -11,6 +11,9 @@ export async function GET(request: Request) {
     await supabase.auth.exchangeCodeForSession(code);
   }
 
-  // Always redirect to the dashboard on the production domain
-  return NextResponse.redirect(new URL('/dashboard', 'https://smartrisk.co.il'));
+  // Get the site URL from environment variable, fallback to request URL for local development
+  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || requestUrl.origin;
+  
+  // Redirect to dashboard
+  return NextResponse.redirect(new URL('/dashboard', siteUrl));
 } 
