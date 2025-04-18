@@ -182,11 +182,56 @@ export async function DELETE(
       );
     }
 
-    // Delete the assessment
+    // First delete all assessment_data entries
+    const { error: deleteDataError } = await supabase
+      .from('assessment_data')
+      .delete()
+      .eq('assessment_id', assessmentId);
+
+    if (deleteDataError) {
+      console.error('Error deleting assessment data:', deleteDataError);
+      return NextResponse.json(
+        { error: 'Failed to delete assessment data' },
+        { status: 500 }
+      );
+    }
+
+    // List and delete files from storage
+    const { data: files, error: listError } = await supabase
+      .storage
+      .from('assessment-files')
+      .list(`${userId}/${assessmentId}`);
+
+    if (listError) {
+      console.error('Error listing files:', listError);
+      return NextResponse.json(
+        { error: 'Failed to list assessment files' },
+        { status: 500 }
+      );
+    }
+
+    if (files && files.length > 0) {
+      const filePaths = files.map(file => `${userId}/${assessmentId}/${file.name}`);
+      const { error: deleteStorageError } = await supabase
+        .storage
+        .from('assessment-files')
+        .remove(filePaths);
+
+      if (deleteStorageError) {
+        console.error('Error deleting files from storage:', deleteStorageError);
+        return NextResponse.json(
+          { error: 'Failed to delete assessment files' },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Finally delete the assessment itself
     const { error } = await supabase
       .from('assessments')
       .delete()
-      .eq('id', assessmentId);
+      .eq('id', assessmentId)
+      .eq('user_id', userId);
 
     if (error) {
       console.error('Error deleting assessment:', error);

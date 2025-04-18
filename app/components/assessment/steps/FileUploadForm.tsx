@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { FiUpload, FiFile, FiTrash, FiDownload } from 'react-icons/fi';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 interface UploadedFile {
   id: string;
@@ -11,12 +10,15 @@ interface UploadedFile {
   file_url: string;
   file_size: number;
   file_type: string;
+  file_category: string;
   created_at: string;
 }
 
 const FileUploadForm: React.FC<{ assessmentId?: string }> = ({ assessmentId }) => {
   const { setValue, watch } = useFormContext();
   const [dragActive, setDragActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -29,7 +31,7 @@ const FileUploadForm: React.FC<{ assessmentId?: string }> = ({ assessmentId }) =
           const response = await fetch(`/api/assessment/${assessmentId}/files`);
           if (response.ok) {
             const data = await response.json();
-            setUploadedFiles(data.files);
+            setUploadedFiles(data.files || []);
           }
         } catch (error) {
           console.error('Error loading uploaded files:', error);
@@ -51,7 +53,36 @@ const FileUploadForm: React.FC<{ assessmentId?: string }> = ({ assessmentId }) =
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const uploadFile = async (file: File) => {
+    if (!assessmentId) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('category', 'general'); // You can make this dynamic if needed
+
+    try {
+      const response = await fetch(`/api/assessment/${assessmentId}/files`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const data = await response.json();
+      if (data.success && data.file) {
+        setUploadedFiles(prev => [...prev, data.file]);
+        setSelectedFiles(prev => prev.filter(f => f.name !== file.name));
+        setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setUploadProgress(prev => ({ ...prev, [file.name]: -1 })); // -1 indicates error
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
@@ -59,23 +90,28 @@ const FileUploadForm: React.FC<{ assessmentId?: string }> = ({ assessmentId }) =
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const newFiles = Array.from(e.dataTransfer.files);
       setSelectedFiles(prev => [...prev, ...newFiles]);
-      setValue('documents', [...selectedFiles, ...newFiles]);
+      
+      // Start uploading the dropped files
+      setUploading(true);
+      for (const file of newFiles) {
+        await uploadFile(file);
+      }
+      setUploading(false);
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files);
       setSelectedFiles(prev => [...prev, ...newFiles]);
-      setValue('documents', [...selectedFiles, ...newFiles]);
+      
+      // Start uploading the selected files
+      setUploading(true);
+      for (const file of newFiles) {
+        await uploadFile(file);
+      }
+      setUploading(false);
     }
-  };
-
-  const removeFile = (index: number) => {
-    const updatedFiles = [...selectedFiles];
-    updatedFiles.splice(index, 1);
-    setSelectedFiles(updatedFiles);
-    setValue('documents', updatedFiles);
   };
 
   const deleteUploadedFile = async (fileId: string) => {
@@ -125,6 +161,7 @@ const FileUploadForm: React.FC<{ assessmentId?: string }> = ({ assessmentId }) =
                 className="sr-only"
                 multiple
                 onChange={handleFileChange}
+                disabled={uploading}
               />
             </label>
             <p className="pr-1">או גרור ושחרר</p>
@@ -158,6 +195,7 @@ const FileUploadForm: React.FC<{ assessmentId?: string }> = ({ assessmentId }) =
                   type="button"
                   className="text-red-600 hover:text-red-500"
                   onClick={() => deleteUploadedFile(file.id)}
+                  disabled={uploading}
                 >
                   <FiTrash />
                 </button>
@@ -172,13 +210,11 @@ const FileUploadForm: React.FC<{ assessmentId?: string }> = ({ assessmentId }) =
               </div>
               <div className="flex space-x-4">
                 <span className="text-gray-500">{Math.round(file.size / 1024)} KB</span>
-                <button
-                  type="button"
-                  className="font-medium text-red-600 hover:text-red-500"
-                  onClick={() => removeFile(index)}
-                >
-                  <FiTrash />
-                </button>
+                {uploadProgress[file.name] === -1 ? (
+                  <span className="text-red-500">Upload failed</span>
+                ) : uploadProgress[file.name] ? (
+                  <span className="text-gray-500">{uploadProgress[file.name]}%</span>
+                ) : null}
               </div>
             </li>
           ))}

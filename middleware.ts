@@ -6,17 +6,34 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
   const supabase = createMiddlewareClient({ req, res });
 
-  // Refresh session if expired - required for Server Components
+  // Check if this is an RSC request
+  const isRSC = req.headers.get('RSC') === '1' || req.headers.get('Next-Router-State-Tree') || req.nextUrl.searchParams.has('_rsc');
+  if (isRSC) {
+    return res;
+  }
+
+  // Get the current session
   const { data: { session } } = await supabase.auth.getSession();
 
-  // If accessing protected routes without auth, redirect to login
-  if (!session && req.nextUrl.pathname.startsWith('/dashboard')) {
+  // Define paths
+  const isAuthPath = req.nextUrl.pathname.startsWith('/auth');
+  const isDashboardPath = req.nextUrl.pathname.startsWith('/dashboard');
+  const isAssessmentPath = req.nextUrl.pathname.startsWith('/assessment');
+  const isSettingsPath = req.nextUrl.pathname.startsWith('/settings');
+  const isHelpPath = req.nextUrl.pathname.startsWith('/help');
+  const isHomePath = req.nextUrl.pathname === '/';
+
+  // Protected routes that require authentication
+  const isProtectedRoute = isDashboardPath || isAssessmentPath || isSettingsPath || isHelpPath;
+
+  // If the user is not signed in and trying to access a protected route
+  if (!session && isProtectedRoute) {
     const redirectUrl = new URL('/auth/login', req.url);
     return NextResponse.redirect(redirectUrl);
   }
 
-  // If accessing auth routes while authenticated, redirect to dashboard
-  if (session && (req.nextUrl.pathname.startsWith('/auth/login') || req.nextUrl.pathname === '/')) {
+  // If the user is signed in and trying to access auth pages or home page
+  if (session && (isAuthPath || isHomePath)) {
     const redirectUrl = new URL('/dashboard', req.url);
     return NextResponse.redirect(redirectUrl);
   }
@@ -24,16 +41,18 @@ export async function middleware(req: NextRequest) {
   return res;
 }
 
-// Ensure the middleware is run for auth endpoints
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public (public files)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+    '/',
+    '/auth/:path*',
+    '/dashboard/:path*',
+    '/assessment/:path*',
+    '/settings/:path*',
+    '/help/:path*',
+    '/about',
+    '/contact',
+    '/pricing',
+    '/features',
+    '/assessments',
   ],
 }; 

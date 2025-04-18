@@ -13,6 +13,8 @@ type AssessmentStatus = 'draft' | 'submitted' | 'processing' | 'completed' | 'an
 
 interface DashboardAssessment extends Omit<Assessment, 'status'> {
   status: AssessmentStatus;
+  business_field?: string;
+  business_type?: string;
 }
 
 export default function Dashboard() {
@@ -247,31 +249,20 @@ export default function Dashboard() {
                         : 'bg-white border border-gray-100'
                       }`}>
                         {getStatusIcon(assessment.status as AssessmentStatus)}
-                        <span 
-                          style={{ 
-                            color: assessment.status === 'draft' ? '#3b82f6' : '#374151'
-                          }}
-                          className="mr-1"
-                        >
-                          {getStatusText(assessment.status as AssessmentStatus)}
-                        </span>
+                        <span className="mr-1.5 text-gray-700">{getStatusText(assessment.status as AssessmentStatus)}</span>
                       </div>
                     </div>
-                    <div className="mt-3 text-sm text-gray-500">
-                      {formatDate(assessment.created_at || '')}
-                    </div>
-                    <div className="mt-4 flex flex-row gap-4 items-center">
-                      <div className="text-sm">
-                        <span className="text-gray-700 font-bold">תחום: </span>
-                        <span className="text-gray-600">
-                          {assessment.business_field || 'לא צוין'}
-                        </span>
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center text-sm text-gray-600">
+                        <span className="font-bold ml-2">תחום:</span>
+                        <span>{assessment.business_field || 'לא צוין'}</span>
                       </div>
-                      <div className="text-sm">
-                        <span className="text-gray-700 font-bold">סוג: </span>
-                        <span className="text-gray-600">
-                          {assessment.business_type || 'לא צוין'}
-                        </span>
+                      <div className="flex items-center text-sm text-gray-600">
+                        <span className="font-bold ml-2">סוג:</span>
+                        <span>{assessment.business_type || 'לא צוין'}</span>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-500 mt-4">
+                        <span>נוצר ב-{formatDate(assessment.created_at || '')}</span>
                       </div>
                     </div>
                   </div>

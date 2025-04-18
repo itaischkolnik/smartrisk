@@ -19,11 +19,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleSignOut = async () => {
+  const handleSignOut = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent any default navigation
     try {
       await signOut();
+      // The redirect will be handled by the AuthContext's onAuthStateChange
     } catch (error) {
       console.error('Error signing out:', error);
+      // You could add a toast notification here to show the error to the user
     }
   };
 
@@ -107,7 +110,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  style={{ backgroundColor: 'transparent', borderColor: '#ffffff', borderWidth: '2px', color: 'white', borderStyle: 'solid' }}
+                  style={{ backgroundColor: 'transparent', borderColor: '#ffffff', borderWidth: '2px', color: 'white', borderStyle: 'solid', cursor: 'pointer' }}
                   className="w-3/4 flex flex-row-reverse items-center justify-center py-2 px-4 rounded-lg hover:bg-white/10 transition-all mb-2"
                   title="התנתק"
                   dir="rtl"

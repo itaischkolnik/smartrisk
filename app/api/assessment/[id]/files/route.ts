@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
 
+function sanitizeFileName(fileName: string): string {
+  // Remove any path components
+  const name = fileName.split(/[\\/]/).pop() || '';
+  // Remove any non-alphanumeric characters except dots and dashes
+  return name.replace(/[^a-zA-Z0-9.-]/g, '_');
+}
+
+// GET /api/assessment/[id]/files - List all files
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -21,11 +28,11 @@ export async function GET(
     const userId = session.user.id;
     const assessmentId = params.id;
 
-    // Fetch files for the assessment
+    // Fetch files for the assessment from the database
     const { data: files, error } = await supabase
-      .storage
-      .from('assessment-files')
-      .list(`${userId}/${assessmentId}`);
+      .from('files')
+      .select('*')
+      .eq('assessment_id', assessmentId);
 
     if (error) {
       console.error('Error fetching files:', error);
@@ -35,7 +42,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(files);
+    return NextResponse.json({ files });
   } catch (error) {
     console.error('Error in files GET route:', error);
     return NextResponse.json(
@@ -45,8 +52,9 @@ export async function GET(
   }
 }
 
+// POST /api/assessment/[id]/files - Upload a new file
 export async function POST(
-  request: Request,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -64,43 +72,86 @@ export async function POST(
     const userId = session.user.id;
     const assessmentId = params.id;
 
-    // Get the file data from the request
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-
-    if (!file) {
-      return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400 }
-      );
+    if (!assessmentId) {
+      return NextResponse.json({ error: 'Assessment ID is required' }, { status: 400 });
     }
 
-    // Upload the file
-    const { data, error } = await supabase
+    // Process the file upload
+    const formData = await req.formData();
+    const file = formData.get('file') as File;
+    
+    if (!file) {
+      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
+    }
+
+    // Get file category
+    const fileCategory = formData.get('category') as string || 'general';
+
+    // Convert file to buffer
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Generate a unique filename with sanitization
+    const timestamp = Date.now();
+    const sanitizedFileName = sanitizeFileName(file.name);
+    const filename = `${userId}/${assessmentId}/${timestamp}_${sanitizedFileName}`;
+
+    // Upload file to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase
       .storage
       .from('assessment-files')
-      .upload(`${userId}/${assessmentId}/${file.name}`, file);
+      .upload(filename, buffer, {
+        contentType: file.type,
+        cacheControl: '3600',
+      });
 
-    if (error) {
-      console.error('Error uploading file:', error);
-      return NextResponse.json(
-        { error: 'Failed to upload file' },
-        { status: 500 }
-      );
+    if (uploadError) {
+      console.error('Error uploading file:', uploadError);
+      return NextResponse.json({ 
+        error: 'Failed to upload file',
+        details: uploadError.message
+      }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    // Get public URL for the file
+    const { data: { publicUrl } } = supabase
+      .storage
+      .from('assessment-files')
+      .getPublicUrl(filename);
+
+    // Save file record in the database
+    const { data: fileRecord, error: fileError } = await supabase
+      .from('files')
+      .insert({
+        assessment_id: assessmentId,
+        file_name: file.name,
+        file_url: publicUrl,
+        file_type: file.type,
+        file_size: file.size,
+        file_category: fileCategory,
+      })
+      .select()
+      .single();
+
+    if (fileError) {
+      console.error('Error saving file record:', fileError);
+      return NextResponse.json({ error: 'Failed to save file record' }, { status: 500 });
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      file: fileRecord
+    });
+
   } catch (error) {
-    console.error('Error in file upload:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Error uploading file:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
+// DELETE /api/assessment/[id]/files/[fileId] - Delete a file
 export async function DELETE(
-  req: NextRequest,
+  request: Request,
   { params }: { params: { id: string; fileId: string } }
 ) {
   try {
@@ -138,7 +189,7 @@ export async function DELETE(
     const { error: storageError } = await supabase
       .storage
       .from('assessment-files')
-      .remove([`${assessmentId}/${filename}`]);
+      .remove([`${session.user.id}/${assessmentId}/${filename}`]);
 
     if (storageError) {
       console.error('Error deleting file from storage:', storageError);

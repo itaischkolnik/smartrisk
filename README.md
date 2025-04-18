@@ -157,3 +157,53 @@ yarn dev
 
 ## 📄 License
 [Your License Here]
+
+These are the schemas of the Supabase tables:
+
+assessments table schema:
+
+| column_name   | data_type                |
+| ------------- | ------------------------ |
+| id            | uuid                     |
+| user_id       | uuid                     |
+| business_name | text                     |
+| status        | text                     |
+| summary       | text                     |
+| report_url    | text                     |
+| created_at    | timestamp with time zone |
+| updated_at    | timestamp with time zone |
+
+assessment_data table schema:
+
+| column_name   | data_type                |
+| ------------- | ------------------------ |
+| id            | uuid                     |
+| assessment_id | uuid                     |
+| section       | text                     |
+| data          | jsonb                    |
+| created_at    | timestamp with time zone |
+| updated_at    | timestamp with time zone |
+
+files table schema:
+
+| column_name   | data_type                |
+| ------------- | ------------------------ |
+| id            | uuid                     |
+| assessment_id | uuid                     |
+| file_name     | text                     |
+| file_url      | text                     |
+| file_type     | text                     |
+| file_size     | bigint                   |
+| file_category | text                     |
+| created_at    | timestamp with time zone |
+
+profiles table schema:
+
+| column_name | data_type                |
+| ----------- | ------------------------ |
+| id          | uuid                     |
+| email       | text                     |
+| full_name   | text                     |
+| avatar_url  | text                     |
+| created_at  | timestamp with time zone |
+| updated_at  | timestamp with time zone |

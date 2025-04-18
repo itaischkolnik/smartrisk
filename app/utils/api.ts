@@ -71,13 +71,42 @@ try {
 export async function getUserAssessments(userId: string) {
   try {
     const client = await getAuthenticatedClient();
-    const { data, error } = await client
+    
+    // First get all assessments
+    const { data: assessments, error: assessmentsError } = await client
       .from('assessments')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
-    return { assessments: data as Assessment[] | null, error };
+    if (assessmentsError) throw assessmentsError;
+
+    // For each assessment, get its business details section
+    const assessmentsWithDetails = await Promise.all((assessments || []).map(async (assessment) => {
+      const { data: sectionData, error: sectionsError } = await client
+        .from('assessment_data')
+        .select('data')
+        .eq('assessment_id', assessment.id)
+        .eq('section', 'business_details')
+        .maybeSingle();
+
+      if (sectionsError) {
+        console.error('Error fetching business details for assessment:', assessment.id, sectionsError);
+        return assessment;
+      }
+
+      const businessDetails = sectionData?.data || {};
+      
+      // Merge the business details with the assessment
+      return {
+        ...assessment,
+        business_name: businessDetails.business_name || assessment.business_name || 'עסק ללא שם',
+        business_type: businessDetails.business_type || 'לא צוין',
+        business_field: businessDetails.business_field || 'לא צוין'
+      };
+    }));
+
+    return { assessments: assessmentsWithDetails as Assessment[] | null, error: null };
   } catch (error) {
     console.error('Error fetching assessments:', error);
     return { assessments: null, error: error as Error };
@@ -111,67 +140,88 @@ export async function saveAssessment(assessment: Partial<Assessment>, user: User
     const client = await getAuthenticatedClient();
     const now = new Date().toISOString();
     
-    // If assessment has an ID, check if it exists first
-    if (assessment.id) {
-      // Check if assessment exists and belongs to user
-      const { data: existingAssessment, error: checkError } = await client
-        .from('assessments')
-        .select('id')
-        .eq('id', assessment.id)
-        .eq('user_id', user.id)
-        .single();
+    // Create a valid assessment object that matches the schema exactly
+    const validAssessment = {
+      user_id: user.id,
+      business_name: assessment.business_name || '',
+      status: assessment.status || 'draft',
+      summary: assessment.summary || '',
+      report_url: assessment.report_url || '',
+      updated_at: now,
+    };
 
-      if (checkError || !existingAssessment) {
-        // If assessment doesn't exist or doesn't belong to user, create new one
+    try {
+      // If we have an ID, update existing assessment
+      if (assessment.id) {
+        const { data: existingAssessment, error: checkError } = await client
+          .from('assessments')
+          .select('id, created_at')
+          .eq('id', assessment.id)
+          .eq('user_id', user.id)
+          .single();
+
+        if (checkError) {
+          // Create new if doesn't exist
+          const { data, error } = await client
+            .from('assessments')
+            .insert({
+              ...validAssessment,
+              created_at: now,
+            })
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Insert error:', error);
+            throw error;
+          }
+          return { assessment: data, error: null };
+        }
+
+        // Update existing assessment
         const { data, error } = await client
           .from('assessments')
-          .insert({
-            ...assessment,
-            id: undefined, // Remove the ID to let Supabase generate a new one
-            user_id: user.id,
-            created_at: now,
-            updated_at: now,
+          .update({
+            ...validAssessment,
+            created_at: existingAssessment.created_at, // Keep original creation date
           })
+          .eq('id', assessment.id)
+          .eq('user_id', user.id)
           .select()
           .single();
 
-        return { assessment: data as Assessment | null, error };
+        if (error) {
+          console.error('Update error:', error);
+          throw error;
+        }
+        return { assessment: data, error: null };
       }
 
-      // If assessment exists and belongs to user, update it
-      const { data, error } = await client
-        .from('assessments')
-        .update({
-          ...assessment,
-          updated_at: now,
-        })
-        .eq('id', assessment.id)
-        .eq('user_id', user.id)
-        .select()
-        .single();
-
-      return { assessment: data as Assessment | null, error };
-    } 
-    // If no ID provided, create new assessment
-    else {
+      // Create new assessment
       const { data, error } = await client
         .from('assessments')
         .insert({
-          ...assessment,
-          user_id: user.id,
+          ...validAssessment,
           created_at: now,
-          updated_at: now,
         })
         .select()
         .single();
 
-      return { assessment: data as Assessment | null, error };
+      if (error) {
+        console.error('Insert error:', error);
+        throw error;
+      }
+      return { assessment: data, error: null };
+
+    } catch (error) {
+      console.error('Database operation failed:', error);
+      throw error;
     }
   } catch (error) {
-    console.error('Error saving assessment:', error);
+    console.error('Error in saveAssessment:', error);
     return { 
       assessment: null, 
-      error: error instanceof PostgrestError ? error : new Error('Failed to save assessment') 
+      error: error instanceof Error ? error : new Error('Failed to save assessment')
     };
   }
 }

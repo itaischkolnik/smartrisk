@@ -128,16 +128,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
+      // First attempt to sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
       // Clear state after successful sign out
       setUser(null);
       setSession(null);
+      
+      // Force a router refresh to update the UI
       router.refresh();
-      router.push('/');
+      
+      // Redirect to home page
+      window.location.href = '/';
     } catch (error) {
       console.error('Error signing out:', error);
+      throw error; // Re-throw the error so it can be handled by the component
     }
   };
 

@@ -9,8 +9,9 @@ import { FiArrowLeft, FiArrowRight, FiSave, FiSend } from 'react-icons/fi';
 import { User } from '@supabase/supabase-js';
 import { saveAssessment, submitAssessmentForAnalysis, saveAssessmentData, getAssessmentData } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
-import Alert from '../common/Alert';
+import PortalAlert from '../common/PortalAlert';
 import { Assessment } from '../../types/assessment';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 // Import all form steps from the index file
 import {
@@ -127,6 +128,7 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
     message: '',
     type: 'info'
   });
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const router = useRouter();
   const { user } = useAuth();
   
@@ -166,15 +168,70 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
           }
 
           if (assessment && sections) {
-            // Reset form with assessment data
-            const formData: Partial<FormValues> = {
-              business_name: assessment.business_name || '',
-            };
+            // Initialize form data with empty values
+            const formData: Partial<FormValues> = {};
 
             // Map section data to form fields
             sections.forEach((section: AssessmentSection) => {
               if (section.data) {
-                Object.assign(formData, section.data);
+                switch (section.section) {
+                  case 'personal_details':
+                    Object.assign(formData, {
+                      full_name: section.data.full_name || '',
+                      age: section.data.age || '',
+                      location: section.data.location || '',
+                      marital_status: section.data.marital_status || '',
+                      occupation: section.data.occupation || '',
+                      self_introduction: section.data.self_introduction || '',
+                    });
+                    break;
+                  case 'personal_questionnaire':
+                    Object.assign(formData, {
+                      life_experience: section.data.life_experience || '',
+                      motivation: section.data.motivation || '',
+                      financial_capability: section.data.financial_capability || '',
+                      five_year_goals: section.data.five_year_goals || '',
+                    });
+                    break;
+                  case 'business_details':
+                    Object.assign(formData, {
+                      business_name: section.data.business_name || assessment.business_name || '',
+                      business_type: section.data.business_type || '',
+                      industry: section.data.industry || '',
+                      establishment_date: section.data.establishment_date || '',
+                      employee_count: section.data.employee_count || '',
+                      business_structure: section.data.business_structure || '',
+                      business_location: section.data.business_location || '',
+                      operating_hours: section.data.operating_hours || '',
+                      property_details: section.data.property_details || '',
+                      sale_reason: section.data.sale_reason || '',
+                      legal_issues: section.data.legal_issues || '',
+                      additional_notes: section.data.additional_notes || '',
+                    });
+                    break;
+                  case 'financial_data':
+                    Object.assign(formData, {
+                      asking_price: section.data.asking_price || '',
+                      annual_revenue: section.data.annual_revenue || '',
+                      operating_profit: section.data.operating_profit || '',
+                      net_profit: section.data.net_profit || '',
+                      inventory_value: section.data.inventory_value || '',
+                      equipment_value: section.data.equipment_value || '',
+                      monthly_salary_expenses: section.data.monthly_salary_expenses || '',
+                      monthly_expenses: section.data.monthly_expenses || '',
+                      payment_terms: section.data.payment_terms || '',
+                      financial_notes: section.data.financial_notes || '',
+                    });
+                    break;
+                  case 'swot_analysis':
+                    Object.assign(formData, {
+                      strengths: section.data.strengths || '',
+                      weaknesses: section.data.weaknesses || '',
+                      opportunities: section.data.opportunities || '',
+                      threats: section.data.threats || '',
+                    });
+                    break;
+                }
               }
             });
 
@@ -202,253 +259,7 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
     { title: 'העלאת קבצים', component: FileUploadForm },
   ];
   
-  const nextStep = async () => {
-    // Save draft on step change
-    const values = methods.getValues();
-    if (user) {
-      try {
-        const now = new Date().toISOString();
-
-        // Basic assessment data only - minimal required fields
-        const assessmentData: Partial<Assessment> = {
-          id: assessmentId,
-          user_id: user.id,
-          status: 'draft' as const,
-          created_at: now,
-          updated_at: now,
-          business_name: values.business_name || undefined
-        };
-
-        // Save the main assessment record
-        const { assessment, error } = await saveAssessment(assessmentData, user);
-        
-        if (error) {
-          console.error('Error saving draft:', error);
-          return;
-        }
-
-        // If we have an assessment ID, save the section data
-        const currentAssessmentId = assessment?.id || assessmentId;
-        if (currentAssessmentId) {
-          const sectionData = {
-            assessment_id: currentAssessmentId,
-            created_at: now,
-            updated_at: now,
-          };
-
-          // Save section data based on current step
-          let sectionResult;
-          switch (currentStep) {
-            case 0:
-              sectionResult = await saveAssessmentData({
-                ...sectionData,
-                section: 'personal_details',
-                data: {
-                  full_name: values.full_name || '',
-                  age: values.age || '',
-                  location: values.location || '',
-                  marital_status: values.marital_status || '',
-                  occupation: values.occupation || '',
-                  self_introduction: values.self_introduction || '',
-                },
-              });
-              break;
-            case 1:
-              sectionResult = await saveAssessmentData({
-                ...sectionData,
-                section: 'personal_questionnaire',
-                data: {
-                  life_experience: values.life_experience || '',
-                  motivation: values.motivation || '',
-                  financial_capability: values.financial_capability || '',
-                  five_year_goals: values.five_year_goals || '',
-                },
-              });
-              break;
-            case 2:
-              sectionResult = await saveAssessmentData({
-                ...sectionData,
-                section: 'business_details',
-                data: {
-                  business_name: values.business_name || '',
-                  business_type: values.business_type || '',
-                  industry: values.industry || '',
-                  establishment_date: values.establishment_date || '',
-                  employee_count: values.employee_count || '',
-                  business_structure: values.business_structure || '',
-                  business_location: values.business_location || '',
-                  operating_hours: values.operating_hours || '',
-                  property_details: values.property_details || '',
-                  sale_reason: values.sale_reason || '',
-                  legal_issues: values.legal_issues || '',
-                  additional_notes: values.additional_notes || '',
-                },
-              });
-              break;
-            case 3:
-              sectionResult = await saveAssessmentData({
-                ...sectionData,
-                section: 'financial_data',
-                data: {
-                  asking_price: values.asking_price || '',
-                  annual_revenue: values.annual_revenue || '',
-                  operating_profit: values.operating_profit || '',
-                  net_profit: values.net_profit || '',
-                  inventory_value: values.inventory_value || '',
-                  equipment_value: values.equipment_value || '',
-                  monthly_salary_expenses: values.monthly_salary_expenses || '',
-                  monthly_expenses: values.monthly_expenses || '',
-                  payment_terms: values.payment_terms || '',
-                  financial_notes: values.financial_notes || '',
-                },
-              });
-              break;
-            case 4:
-              sectionResult = await saveAssessmentData({
-                ...sectionData,
-                section: 'swot_analysis',
-                data: {
-                  strengths: values.strengths || '',
-                  weaknesses: values.weaknesses || '',
-                  opportunities: values.opportunities || '',
-                  threats: values.threats || '',
-                },
-              });
-              break;
-            case 5:
-              if (values.documents && values.documents.length > 0) {
-                for (const file of Array.from(values.documents)) {
-                  const formData = new FormData();
-                  formData.append('file', file);
-                  formData.append('category', 'general');
-                  
-                  try {
-                    console.log('Uploading file:', file.name);
-                    console.log('Assessment ID:', currentAssessmentId);
-                    
-                    const response = await fetch(`/api/assessment/${currentAssessmentId}/file`, {
-                      method: 'POST',
-                      body: formData,
-                    });
-
-                    if (!response.ok) {
-                      const errorText = await response.text();
-                      console.log('Upload error response:', errorText);
-                      let errorMessage;
-                      try {
-                        const errorData = JSON.parse(errorText);
-                        console.log('Parsed error data:', errorData);
-                        errorMessage = errorData.error;
-                        if (errorData.details) {
-                          console.log('Error details:', errorData.details);
-                          errorMessage += `: ${errorData.details.message || ''}`;
-                        }
-                      } catch (e) {
-                        errorMessage = `Failed to upload file: ${file.name} (${response.status})`;
-                      }
-                      throw new Error(errorMessage);
-                    }
-
-                    const result = await response.json();
-                    console.log('Upload success:', result);
-                    
-                    if (!result.success) {
-                      throw new Error(`Failed to upload file: ${file.name}`);
-                    }
-                  } catch (error) {
-                    console.error('Error uploading file:', error);
-                    throw error;
-                  }
-                }
-              }
-              break;
-          }
-
-          if (sectionResult?.error) {
-            console.error('Error saving section data:', sectionResult.error);
-            return;
-          }
-        }
-      } catch (error) {
-        console.error('Error saving draft:', error);
-      }
-    }
-    
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-  
-  const prevStep = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-  
-  const showAlert = (message: string, type: AlertType = 'info') => {
-    setAlertState({
-      isOpen: true,
-      message,
-      type
-    });
-  };
-
-  const closeAlert = () => {
-    setAlertState(prev => ({ ...prev, isOpen: false }));
-  };
-
-  const onSubmit = async (data: FormValues) => {
-    setIsSubmitting(true);
-    
-    if (!user) {
-      showAlert('עליך להתחבר כדי לשלוח את השאלון', 'error');
-      setIsSubmitting(false);
-      return;
-    }
-    
-    try {
-      // Transform form data to match Assessment type
-      const assessmentData = {
-        ...data,
-        asking_price: typeof data.asking_price === 'string' ? parseInt(data.asking_price) : data.asking_price,
-        annual_revenue: typeof data.annual_revenue === 'string' ? parseInt(data.annual_revenue) : data.annual_revenue,
-        operating_profit: typeof data.operating_profit === 'string' ? parseInt(data.operating_profit) : data.operating_profit,
-        net_profit: typeof data.net_profit === 'string' ? parseInt(data.net_profit) : data.net_profit,
-        inventory_value: typeof data.inventory_value === 'string' ? parseInt(data.inventory_value) : data.inventory_value,
-        equipment_value: typeof data.equipment_value === 'string' ? parseInt(data.equipment_value) : data.equipment_value,
-        salary_expenses: typeof data.monthly_salary_expenses === 'string' ? parseInt(data.monthly_salary_expenses) : data.monthly_salary_expenses,
-        status: 'completed' as const,
-      };
-
-      // First save as completed
-      const { assessment, error } = await saveAssessment(assessmentData, user);
-      
-      if (error) {
-        throw new Error(error.message);
-      }
-      
-      // Then submit for analysis
-      if (assessment) {
-        const result = await submitAssessmentForAnalysis(assessment);
-        if (result.success) {
-          router.push(`/assessment/success?id=${assessment.id}`);
-        } else {
-          throw new Error(result.error || 'Failed to submit assessment for analysis');
-        }
-      }
-    } catch (error) {
-      console.error('Error submitting assessment:', error);
-      showAlert('אירעה שגיאה בעת שליחת השאלון. אנא נסה שוב מאוחר יותר.', 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-  
-  // Render current step component
-  const StepComponent = steps[currentStep].component;
-  
-  // Update the save draft button handler similarly
-  const saveDraft = async () => {
+  const saveDraft = async (showSuccessMessage = true) => {
     const values = methods.getValues();
     if (!user) {
       showAlert('עליך להתחבר כדי לשמור טיוטה', 'error');
@@ -456,38 +267,32 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
     }
 
     try {
-      const now = new Date().toISOString();
-
-      // Basic assessment data only - minimal required fields
-      const assessmentData: Partial<Assessment> = {
+      // First save the basic assessment
+      const { assessment, error: saveError } = await saveAssessment({
         id: assessmentId,
         user_id: user.id,
-        status: 'draft' as const,
-        created_at: now,
-        updated_at: now,
-        business_name: values.business_name || undefined
-      };
+        status: 'draft',
+      }, user);
 
-      // Save the main assessment record
-      const { assessment, error } = await saveAssessment(assessmentData, user);
-      
-      if (error) {
-        throw error;
+      if (saveError) {
+        console.error('Error saving assessment:', saveError);
+        showAlert('אירעה שגיאה בשמירת הטיוטה. אנא נסה שוב.', 'error');
+        return;
       }
 
-      const currentAssessmentId = assessment?.id || assessmentId;
-      if (!currentAssessmentId) {
-        throw new Error('No assessment ID available');
+      if (!assessment?.id) {
+        throw new Error('No assessment ID returned from save');
       }
 
-      // Save section data
+      // Then save the current section data
+      const now = new Date().toISOString();
       const sectionData = {
-        assessment_id: currentAssessmentId,
+        assessment_id: assessment.id,
         created_at: now,
         updated_at: now,
       };
 
-      // Save section-specific data
+      // Save section data based on current step
       let sectionResult;
       switch (currentStep) {
         case 0:
@@ -575,9 +380,9 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
               
               try {
                 console.log('Uploading file:', file.name);
-                console.log('Assessment ID:', currentAssessmentId);
+                console.log('Assessment ID:', assessment.id);
                 
-                const response = await fetch(`/api/assessment/${currentAssessmentId}/file`, {
+                const response = await fetch(`/api/assessment/${assessment.id}/file`, {
                   method: 'POST',
                   body: formData,
                 });
@@ -616,18 +421,205 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
       }
 
       if (sectionResult?.error) {
-        throw sectionResult.error;
+        console.error('Error saving section data:', sectionResult.error);
+        showAlert('אירעה שגיאה בשמירת נתוני החלק. אנא נסה שוב.', 'error');
+        return;
       }
-      
-      showAlert('הטופס נשמר בהצלחה כטיוטה', 'success');
+
+      if (showSuccessMessage) {
+        showAlert('הטיוטה נשמרה בהצלחה', 'success');
+      }
     } catch (error) {
       console.error('Error saving draft:', error);
-      showAlert(
-        error instanceof Error ? error.message : 'אירעה שגיאה בשמירת הטיוטה',
-        'error'
-      );
+      showAlert('אירעה שגיאה בשמירת הטיוטה. אנא נסה שוב.', 'error');
     }
   };
+  
+  const nextStep = async () => {
+    // Save the current state silently (without showing success message)
+    await saveDraft(false);
+    
+    // Only proceed if we're not on the last step
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+  
+  const prevStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+  
+  const showAlert = (message: string, type: AlertType = 'info') => {
+    setAlertState({
+      isOpen: true,
+      message,
+      type
+    });
+  };
+
+  const closeAlert = () => {
+    setAlertState(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const onSubmit = async (data: FormValues) => {
+    setIsSubmitting(true);
+    
+    if (!user) {
+      showAlert('עליך להתחבר כדי לשלוח את השאלון', 'error');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    try {
+      // Transform form data to match Assessment type
+      const assessmentData = {
+        ...data,
+        asking_price: typeof data.asking_price === 'string' ? parseInt(data.asking_price) : data.asking_price,
+        annual_revenue: typeof data.annual_revenue === 'string' ? parseInt(data.annual_revenue) : data.annual_revenue,
+        operating_profit: typeof data.operating_profit === 'string' ? parseInt(data.operating_profit) : data.operating_profit,
+        net_profit: typeof data.net_profit === 'string' ? parseInt(data.net_profit) : data.net_profit,
+        inventory_value: typeof data.inventory_value === 'string' ? parseInt(data.inventory_value) : data.inventory_value,
+        equipment_value: typeof data.equipment_value === 'string' ? parseInt(data.equipment_value) : data.equipment_value,
+        salary_expenses: typeof data.monthly_salary_expenses === 'string' ? parseInt(data.monthly_salary_expenses) : data.monthly_salary_expenses,
+        status: 'completed' as const,
+      };
+
+      // First save as completed
+      const { assessment, error } = await saveAssessment(assessmentData, user);
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      // Then submit for analysis
+      if (assessment) {
+        const result = await submitAssessmentForAnalysis(assessment);
+        if (result.success) {
+          router.push(`/assessment/success?id=${assessment.id}`);
+        } else {
+          throw new Error(result.error || 'Failed to submit assessment for analysis');
+        }
+      }
+    } catch (error) {
+      console.error('Error submitting assessment:', error);
+      showAlert('אירעה שגיאה בעת שליחת השאלון. אנא נסה שוב מאוחר יותר.', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const deleteDraft = async () => {
+    if (!user || !assessmentId) {
+      console.log('Missing user or assessmentId:', { user, assessmentId });
+      showAlert('לא ניתן למחוק טיוטה זו', 'error');
+      return;
+    }
+
+    try {
+      console.log('Starting draft deletion process for assessment:', assessmentId);
+      const supabase = createClientComponentClient();
+
+      // First verify the assessment exists and belongs to the user
+      const { data: assessment, error: verifyError } = await supabase
+        .from('assessments')
+        .select('*')
+        .eq('id', assessmentId)
+        .single();
+
+      if (verifyError) {
+        console.error('Error verifying assessment:', verifyError);
+        throw new Error('Failed to verify assessment');
+      }
+
+      if (!assessment) {
+        console.error('Assessment not found');
+        throw new Error('Assessment not found');
+      }
+
+      if (assessment.user_id !== user.id) {
+        console.error('Unauthorized: assessment belongs to different user');
+        throw new Error('Unauthorized');
+      }
+
+      console.log('Found assessment:', assessment);
+
+      // Delete all assessment_data entries first
+      console.log('Deleting assessment data...');
+      const { error: deleteDataError } = await supabase
+        .from('assessment_data')
+        .delete()
+        .eq('assessment_id', assessmentId);
+
+      if (deleteDataError) {
+        console.error('Error deleting assessment data:', deleteDataError);
+        throw new Error('Failed to delete assessment data');
+      }
+
+      // List and delete files from storage
+      console.log('Listing files to delete...');
+      const { data: files, error: listError } = await supabase
+        .storage
+        .from('assessment-files')
+        .list(`${user.id}/${assessmentId}`);
+
+      if (listError) {
+        console.error('Error listing files:', listError);
+        throw new Error('Failed to list assessment files');
+      }
+
+      if (files && files.length > 0) {
+        console.log('Found files to delete:', files);
+        const filePaths = files.map(file => `${user.id}/${assessmentId}/${file.name}`);
+        const { error: deleteStorageError } = await supabase
+          .storage
+          .from('assessment-files')
+          .remove(filePaths);
+
+        if (deleteStorageError) {
+          console.error('Error deleting files from storage:', deleteStorageError);
+          throw new Error('Failed to delete assessment files');
+        }
+      }
+
+      // Finally delete the assessment itself using a direct delete
+      console.log('Deleting assessment record...');
+      const { error: deleteAssessmentError } = await supabase
+        .from('assessments')
+        .delete()
+        .eq('id', assessmentId)
+        .eq('user_id', user.id); // Add explicit user check for RLS
+
+      if (deleteAssessmentError) {
+        console.error('Error deleting assessment:', deleteAssessmentError);
+        throw new Error('Failed to delete assessment');
+      }
+
+      showAlert('הטיוטה נמחקה בהצלחה', 'success');
+      console.log('Draft deletion completed successfully');
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Error deleting draft:', error);
+      showAlert(`אירעה שגיאה במחיקת הטיוטה: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
+  };
+  
+  const handleDeleteClick = () => {
+    setConfirmDeleteOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    setConfirmDeleteOpen(false);
+    await deleteDraft();
+  };
+
+  const handleCancelDelete = () => {
+    setConfirmDeleteOpen(false);
+  };
+  
+  // Render current step component
+  const StepComponent = steps[currentStep].component;
   
   return (
     <div className="max-w-4xl mx-auto px-4 mt-[24px]">
@@ -696,34 +688,38 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
               {/* Navigation buttons */}
               <div className="flex justify-between mt-6">
                 <div>
-                  {currentStep > 0 ? (
+                  {assessmentId && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteClick}
+                      className="flex items-center bg-white hover:bg-gray-50 text-red-600 font-bold py-3 px-6 rounded-lg shadow-md border-2 border-red-600"
+                      style={{ boxShadow: "0 4px 6px rgba(0, 0, 0, 0.2)", cursor: "pointer" }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      מחק טיוטה
+                    </button>
+                  )}
+                </div>
+                
+                <div className="flex space-x-4 items-center">
+                  {currentStep > 0 && (
                     <button
                       type="button"
                       onClick={prevStep}
-                      className="flex items-center bg-white hover:bg-gray-50 text-blue-700 font-bold py-3 px-6 rounded-lg shadow-md border-2 border-blue-700"
+                      className="flex items-center ml-4 bg-white hover:bg-gray-50 text-blue-700 font-bold py-3 px-6 rounded-lg shadow-md border-2 border-blue-700"
                       style={{ boxShadow: "0 4px 6px rgba(0, 0, 0, 0.2)", cursor: "pointer" }}
                       disabled={isSubmitting}
                     >
                       <FiArrowRight className="ml-2" />
                       הקודם
                     </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => router.push('/dashboard')}
-                      className="flex items-center bg-white hover:bg-gray-50 text-blue-700 font-bold py-3 px-6 rounded-lg shadow-md border-2 border-blue-700"
-                      style={{ boxShadow: "0 4px 6px rgba(0, 0, 0, 0.2)", cursor: "pointer" }}
-                    >
-                      <FiArrowRight className="ml-2" />
-                      ביטול
-                    </button>
                   )}
-                </div>
-                
-                <div className="flex space-x-4 items-center">
+                  
                   <button
                     type="button"
-                    onClick={saveDraft}
+                    onClick={() => saveDraft(true)}
                     className="flex items-center ml-4 bg-white hover:bg-gray-50 text-blue-700 font-bold py-3 px-6 rounded-lg shadow-md border-2 border-blue-700"
                     style={{ boxShadow: "0 4px 6px rgba(0, 0, 0, 0.2)", cursor: "pointer" }}
                     disabled={isSubmitting}
@@ -759,13 +755,37 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
             </form>
           </FormProvider>
           
-          {/* Add Alert component */}
-          <Alert
+          {/* Regular alert for success/error messages */}
+          <PortalAlert
             isOpen={alertState.isOpen}
             onClose={closeAlert}
             message={alertState.message}
             type={alertState.type}
           />
+
+          {/* Delete confirmation dialog */}
+          <PortalAlert
+            isOpen={confirmDeleteOpen}
+            onClose={handleCancelDelete}
+            message="האם אתה בטוח שברצונך למחוק טיוטה זו? פעולה זו אינה הפיכה."
+            type="info"
+          >
+            <div className="flex justify-center space-x-4 mt-4 rtl:space-x-reverse">
+              <button
+                onClick={handleConfirmDelete}
+                style={{ backgroundColor: '#4285F4' }}
+                className="hover:bg-[#3367d6] text-white font-bold py-2 px-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4285F4] focus:ring-offset-2 transition-colors duration-200"
+              >
+                מחק
+              </button>
+              <button
+                onClick={handleCancelDelete}
+                className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-colors duration-200"
+              >
+                ביטול
+              </button>
+            </div>
+          </PortalAlert>
         </>
       )}
     </div>
