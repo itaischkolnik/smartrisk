@@ -23,9 +23,9 @@ const getAuthenticatedClient = async () => {
 let openai: OpenAI;
 try {
   // Check if OpenAI API key exists
-  if (process.env.NEXT_PUBLIC_OPENAI_API_KEY && process.env.NEXT_PUBLIC_OPENAI_API_KEY.trim() !== '') {
+  if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== '') {
     openai = new OpenAI({
-      apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
+      apiKey: process.env.OPENAI_API_KEY,
       dangerouslyAllowBrowser: true, // Allow browser usage - this is OK for client-side features
     });
   } else {
