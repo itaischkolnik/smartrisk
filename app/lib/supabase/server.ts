@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -9,18 +9,5 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 export const createServerSupabaseClient = () => {
-  const cookieStore = cookies();
-  
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-    },
-    global: {
-      headers: {
-        cookie: cookieStore.toString(),
-      },
-    },
-  });
+  return createServerComponentClient({ cookies });
 }; 
