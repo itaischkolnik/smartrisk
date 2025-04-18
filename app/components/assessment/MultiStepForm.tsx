@@ -12,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import PortalAlert from '../common/PortalAlert';
 import { Assessment } from '../../types/assessment';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import AnalysisButton from './AnalysisButton';
 
 // Import all form steps from the index file
 import {
@@ -786,6 +787,12 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
               </button>
             </div>
           </PortalAlert>
+
+          {currentStep === steps.length - 1 && assessmentId && (
+            <div className="mt-8">
+              <AnalysisButton assessmentId={assessmentId} />
+            </div>
+          )}
         </>
       )}
     </div>

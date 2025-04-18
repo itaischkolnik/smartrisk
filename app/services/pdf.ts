@@ -1,23 +1,30 @@
 import PDFDocument from 'pdfkit';
 import { Analysis } from '@/types/analysis';
+import { configurePDFKit } from '@/utils/fonts';
 
 export async function generateAnalysisPDF(analysis: Analysis): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
+      // Configure PDFKit to use built-in fonts
+      configurePDFKit();
+
       // Create a document
       const doc = new PDFDocument({
         size: 'A4',
         margin: 50,
-        autoFirstPage: true
+        autoFirstPage: false
       });
 
       // Collect the PDF data chunks
-      const chunks: Buffer[] = [];
+      const chunks: any[] = [];
       doc.on('data', chunk => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
 
-      // Set RTL mode
+      // Add the first page
       doc.addPage({ layout: 'portrait' });
+      
+      // Set default font size and basic styling
+      doc.fontSize(12);
       
       // Add header
       doc.fontSize(24)
