@@ -1,7 +1,6 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { PostgrestError, User } from '@supabase/supabase-js';
 import { Assessment } from '../types/assessment';
-import { OpenAI } from 'openai';
 
 // Create a single instance of the Supabase client with proper configuration
 const supabase = createClientComponentClient();
@@ -18,54 +17,6 @@ const getAuthenticatedClient = async () => {
   
   return supabase;
 };
-
-// Initialize OpenAI with fallback for development
-let openai: OpenAI;
-try {
-  // Check if OpenAI API key exists
-  if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== '') {
-    openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      dangerouslyAllowBrowser: true, // Allow browser usage - this is OK for client-side features
-    });
-  } else {
-    console.warn('OpenAI API key is missing - using mock implementation for development');
-    // Create a mock OpenAI instance for development
-    openai = {
-      chat: {
-        completions: {
-          create: async () => {
-            return {
-              choices: [{
-                message: {
-                  content: "This is a mock OpenAI response for development purposes."
-                }
-              }]
-            };
-          }
-        }
-      }
-    } as unknown as OpenAI;
-  }
-} catch (error) {
-  console.error('Failed to initialize OpenAI:', error);
-  // Create a mock OpenAI instance as fallback
-  openai = {
-    chat: {
-      completions: {
-        create: async () => {
-          return {
-            choices: [{
-              message: {
-                content: "This is a fallback mock OpenAI response."
-              }
-            }]
-          };
-        }
-      }
-    }
-  } as unknown as OpenAI;
-}
 
 // Fetch user's assessments
 export async function getUserAssessments(userId: string) {
@@ -255,26 +206,15 @@ export async function submitAssessmentForAnalysis(assessment: Assessment) {
 
     if (updateError) throw updateError;
 
-    // Send to OpenAI for analysis
-    const analysis = await analyzeAssessmentWithAI(assessment);
+    // Call the analyze API endpoint
+    const response = await fetch(`/api/assessment/${assessment.id}/analyze`, {
+      method: 'POST',
+    });
 
-    // Generate PDF and save to storage
-    const reportUrl = await generateAndSavePDF(assessment, analysis);
-
-    // Update assessment with report URL and completed status
-    const { error } = await supabase
-      .from('assessments')
-      .update({
-        report_url: reportUrl,
-        status: 'completed',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', assessment.id);
-
-    if (error) throw error;
-
-    // Send email with report
-    await sendReportEmail(assessment, reportUrl);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to analyze assessment');
+    }
 
     return { success: true };
   } catch (error) {
@@ -293,84 +233,6 @@ export async function submitAssessmentForAnalysis(assessment: Assessment) {
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
     };
-  }
-}
-
-// Analyze assessment with OpenAI
-export async function analyzeAssessmentWithAI(assessment: Assessment) {
-  try {
-    // Mock OpenAI integration for now
-    // In a real implementation, you would call the OpenAI API here
-    console.log('Analyzing assessment with OpenAI:', assessment.id);
-    
-    // Wait for 2 seconds to simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Return a mock analysis
-    return `
-      # ניתוח עסקי: ${assessment.business_name || 'העסק המוערך'}
-      
-      ## סיכום
-      בהתבסס על הנתונים שסופקו, העסק מציג הזדמנות השקעה ${
-        Math.random() > 0.5 ? 'מבטיחה' : 'בינונית'
-      } עם יחס סיכון-תשואה סביר.
-      
-      ## חוזקות וחולשות
-      * חוזקות: ${assessment.strengths || 'לא צוין'}
-      * חולשות: ${assessment.weaknesses || 'לא צוין'}
-      
-      ## המלצות
-      1. בדיקת נאותות מעמיקה של הנתונים הפיננסיים
-      2. ניתוח מתחרים בשוק המקומי
-      3. בחינת אפשרויות צמיחה
-      
-      ## ניתוח כדאיות
-      מחיר מבוקש: ${assessment.asking_price || 'לא צוין'}
-      החזר השקעה צפוי: ${assessment.roi || 'לא צוין'}
-      
-      הערכת סיכון כללית: בינונית
-    `;
-  } catch (error) {
-    console.error('Error analyzing with OpenAI:', error);
-    return null;
-  }
-}
-
-// Generate PDF and save to storage
-export async function generateAndSavePDF(assessment: Assessment, analysis: string | null) {
-  try {
-    // Mock PDF generation and storage for now
-    // In a real implementation, you would generate a PDF and upload to storage
-    console.log('Generating PDF for assessment:', assessment.id);
-    
-    // Wait for 1 second to simulate PDF generation
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Return a mock URL
-    return `https://example.com/reports/${assessment.id}.pdf`;
-  } catch (error) {
-    console.error('Error generating PDF:', error);
-    return null;
-  }
-}
-
-// Send email with report
-export async function sendReportEmail(assessment: Assessment, reportUrl: string | null) {
-  try {
-    if (!reportUrl) {
-      console.error('Report URL is null, cannot send email');
-      return false;
-    }
-    
-    // Mock email sending for now
-    console.log('Sending email for assessment:', assessment.id);
-    console.log('Report URL:', reportUrl);
-    
-    // In a real implementation, you would send an email with the report URL
-    return true;
-  } catch (error) {
-    console.error('Error sending email:', error);
-    return false;
   }
 }
 
