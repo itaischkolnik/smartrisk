@@ -93,7 +93,7 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<{
       messages: [
         {
           role: "system",
-          content: "אתה יועץ עסקי מומחה המתמחה בניתוח סיכונים והערכת שווי של עסקים. אתה מדבר עברית בלבד."
+          content: "אתה יועץ עסקי מומחה המתמחה בניתוח סיכונים והערכת שווי של עסקים. אתה מדבר עברית בלבד. אנא ענה בפורמט JSON בדיוק כפי שהתבקשת."
         },
         {
           role: "user",
@@ -101,8 +101,7 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<{
         }
       ],
       temperature: 0.7,
-      max_tokens: 4000, // Increased from 2500 as we need detailed analysis
-      response_format: { type: "json_object" }
+      max_tokens: 4000
     });
 
     const content = completion.choices[0].message.content;
@@ -110,24 +109,29 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<{
       throw new Error('OpenAI response content is empty');
     }
 
-    const response = JSON.parse(content);
+    try {
+      const response = JSON.parse(content);
 
-    // Extract and format the response
-    const analysisContent: AnalysisContent = {
-      executiveSummary: response.executiveSummary,
-      businessFundamentals: response.businessFundamentals,
-      financialAnalysis: response.financialAnalysis,
-      marketAnalysis: response.marketAnalysis,
-      swotAnalysis: response.swotAnalysis,
-      recommendations: response.recommendations
-    };
+      // Extract and format the response
+      const analysisContent: AnalysisContent = {
+        executiveSummary: response.executiveSummary,
+        businessFundamentals: response.businessFundamentals,
+        financialAnalysis: response.financialAnalysis,
+        marketAnalysis: response.marketAnalysis,
+        swotAnalysis: response.swotAnalysis,
+        recommendations: response.recommendations
+      };
 
-    const riskScores: RiskScores = response.riskScores;
+      const riskScores: RiskScores = response.riskScores;
 
-    return {
-      content: analysisContent,
-      riskScores
-    };
+      return {
+        content: analysisContent,
+        riskScores
+      };
+    } catch (parseError) {
+      console.error('Error parsing OpenAI response:', parseError);
+      throw new Error('Failed to parse analysis response');
+    }
   } catch (error) {
     console.error('Error generating analysis:', error);
     throw error;
