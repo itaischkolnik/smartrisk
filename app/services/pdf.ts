@@ -1,110 +1,137 @@
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { renderToBuffer, Font, StyleSheet, Document, Page, Text, View } from '@react-pdf/renderer';
 import { Analysis } from '@/types/analysis';
+import type { FC } from 'react';
+
+// Register Arial font
+Font.register({
+  family: 'Arial',
+  src: 'https://db.onlinewebfonts.com/t/0750a0fb32f886c9e87bab8df9fae5fd.ttf'
+});
+
+// Create styles
+const styles = StyleSheet.create({
+  page: {
+    flexDirection: 'column' as const,
+    backgroundColor: '#ffffff',
+    padding: 30,
+    fontFamily: 'Arial'
+  },
+  section: {
+    margin: 10,
+    padding: 10,
+  },
+  header: {
+    fontSize: 24,
+    marginBottom: 20,
+    textAlign: 'right' as const
+  },
+  title: {
+    fontSize: 18,
+    marginBottom: 10,
+    textAlign: 'right' as const
+  },
+  text: {
+    fontSize: 12,
+    marginBottom: 5,
+    textAlign: 'right' as const
+  },
+  list: {
+    marginLeft: 10
+  }
+});
+
+interface AnalysisDocumentProps {
+  analysis: Analysis;
+}
+
+const AnalysisDocument: FC<AnalysisDocumentProps> = ({ analysis }) => (
+  <Document>
+    <Page size="A4" style={styles.page}>
+      <View style={styles.section}>
+        <Text style={styles.header}>ניתוח סיכונים עסקי</Text>
+        <Text style={styles.text}>תאריך: {new Date().toLocaleDateString('he-IL')}</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.title}>תקציר מנהלים</Text>
+        <Text style={styles.text}>המלצה מהירה: {analysis.content.executiveSummary.quickRecommendation}</Text>
+        {analysis.content.executiveSummary.keyHighlights.map((highlight, index) => (
+          <Text key={index} style={styles.text}>• {highlight}</Text>
+        ))}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.title}>ציוני סיכון</Text>
+        <Text style={styles.text}>ציון סיכון כולל: {analysis.riskScores.overall}/10</Text>
+        <Text style={styles.text}>סיכון עסקי: {analysis.riskScores.business}/10</Text>
+        <Text style={styles.text}>סיכון פיננסי: {analysis.riskScores.financial}/10</Text>
+        <Text style={styles.text}>סיכון שוק: {analysis.riskScores.market}/10</Text>
+        <Text style={styles.text}>סיכון SWOT: {analysis.riskScores.swot}/10</Text>
+      </View>
+    </Page>
+
+    {/* Business Fundamentals */}
+    <Page size="A4" style={styles.page}>
+      <View style={styles.section}>
+        <Text style={styles.title}>{analysis.content.businessFundamentals.title}</Text>
+        <Text style={styles.text}>{analysis.content.businessFundamentals.content}</Text>
+        <Text style={styles.text}>ציון סיכון: {analysis.content.businessFundamentals.riskScore}/10</Text>
+      </View>
+    </Page>
+
+    {/* Financial Analysis */}
+    <Page size="A4" style={styles.page}>
+      <View style={styles.section}>
+        <Text style={styles.title}>{analysis.content.financialAnalysis.title}</Text>
+        <Text style={styles.text}>{analysis.content.financialAnalysis.content}</Text>
+        <Text style={styles.text}>ציון סיכון: {analysis.content.financialAnalysis.riskScore}/10</Text>
+      </View>
+    </Page>
+
+    {/* Market Analysis */}
+    <Page size="A4" style={styles.page}>
+      <View style={styles.section}>
+        <Text style={styles.title}>{analysis.content.marketAnalysis.title}</Text>
+        <Text style={styles.text}>{analysis.content.marketAnalysis.content}</Text>
+        <Text style={styles.text}>ציון סיכון: {analysis.content.marketAnalysis.riskScore}/10</Text>
+      </View>
+    </Page>
+
+    {/* SWOT Analysis */}
+    <Page size="A4" style={styles.page}>
+      <View style={styles.section}>
+        <Text style={styles.title}>{analysis.content.swotAnalysis.title}</Text>
+        <Text style={styles.text}>{analysis.content.swotAnalysis.content}</Text>
+        <Text style={styles.text}>ציון סיכון: {analysis.content.swotAnalysis.riskScore}/10</Text>
+      </View>
+    </Page>
+
+    {/* Recommendations */}
+    <Page size="A4" style={styles.page}>
+      <View style={styles.section}>
+        <Text style={styles.title}>המלצות</Text>
+        
+        <Text style={styles.title}>פעולות מומלצות:</Text>
+        {analysis.content.recommendations.actionItems.map((item, index) => (
+          <Text key={index} style={styles.text}>• {item}</Text>
+        ))}
+
+        <Text style={styles.title}>אסטרטגיות להפחתת סיכון:</Text>
+        {analysis.content.recommendations.riskMitigation.map((item, index) => (
+          <Text key={index} style={styles.text}>• {item}</Text>
+        ))}
+
+        <Text style={styles.title}>שיקולי השקעה:</Text>
+        {analysis.content.recommendations.investmentConsiderations.map((item, index) => (
+          <Text key={index} style={styles.text}>• {item}</Text>
+        ))}
+      </View>
+    </Page>
+  </Document>
+);
 
 export async function generateAnalysisPDF(analysis: Analysis): Promise<Buffer> {
-  const doc = await PDFDocument.create();
-  
-  // Use a standard font that supports Hebrew
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  
-  // Create the first page
-  const page = doc.addPage();
-  const { width, height } = page.getSize();
-  
-  // Helper function for text
-  const drawText = (text: string, x: number, y: number, size: number) => {
-    page.drawText(text, {
-      x: x,
-      y: height - y,
-      size,
-      font,
-      color: rgb(0, 0, 0),
-    });
-  };
-
-  // Add header
-  drawText('Business Risk Analysis', 50, 50, 24);
-  drawText(`Date: ${new Date().toLocaleDateString()}`, 50, 80, 12);
-
-  // Add executive summary
-  drawText('Executive Summary', 50, 120, 18);
-  drawText(`Quick Recommendation: ${analysis.content.executiveSummary.quickRecommendation}`, 50, 150, 12);
-  
-  let yOffset = 180;
-  analysis.content.executiveSummary.keyHighlights.forEach((highlight, index) => {
-    drawText(`• ${highlight}`, 50, yOffset, 12);
-    yOffset += 20;
-  });
-
-  // Add risk scores
-  yOffset += 20;
-  drawText('Risk Scores', 50, yOffset, 18);
-  yOffset += 30;
-  drawText(`Overall Risk Score: ${analysis.riskScores.overall}/10`, 50, yOffset, 12);
-  yOffset += 20;
-  drawText(`Business Risk: ${analysis.riskScores.business}/10`, 50, yOffset, 12);
-  yOffset += 20;
-  drawText(`Financial Risk: ${analysis.riskScores.financial}/10`, 50, yOffset, 12);
-  yOffset += 20;
-  drawText(`Market Risk: ${analysis.riskScores.market}/10`, 50, yOffset, 12);
-  yOffset += 20;
-  drawText(`SWOT Risk: ${analysis.riskScores.swot}/10`, 50, yOffset, 12);
-
-  // Add sections
-  const sections = [
-    analysis.content.businessFundamentals,
-    analysis.content.financialAnalysis,
-    analysis.content.marketAnalysis,
-    analysis.content.swotAnalysis,
-  ];
-
-  sections.forEach(section => {
-    // Add new page for each section
-    const sectionPage = doc.addPage();
-    drawText(section.title, 50, 50, 18);
-    
-    // Split content into lines and draw
-    const lines = section.content.split('\n');
-    let lineY = 80;
-    lines.forEach(line => {
-      drawText(line, 50, lineY, 12);
-      lineY += 20;
-    });
-    
-    drawText(`Risk Score: ${section.riskScore}/10`, 50, lineY + 20, 12);
-  });
-
-  // Add recommendations page
-  const recsPage = doc.addPage();
-  drawText('Recommendations', 50, 50, 18);
-  
-  yOffset = 80;
-  drawText('Action Items:', 50, yOffset, 14);
-  yOffset += 20;
-  analysis.content.recommendations.actionItems.forEach(item => {
-    drawText(`• ${item}`, 50, yOffset, 12);
-    yOffset += 20;
-  });
-
-  yOffset += 20;
-  drawText('Risk Mitigation Strategies:', 50, yOffset, 14);
-  yOffset += 20;
-  analysis.content.recommendations.riskMitigation.forEach(item => {
-    drawText(`• ${item}`, 50, yOffset, 12);
-    yOffset += 20;
-  });
-
-  yOffset += 20;
-  drawText('Investment Considerations:', 50, yOffset, 14);
-  yOffset += 20;
-  analysis.content.recommendations.investmentConsiderations.forEach(item => {
-    drawText(`• ${item}`, 50, yOffset, 12);
-    yOffset += 20;
-  });
-
-  // Save the PDF
-  const pdfBytes = await doc.save();
-  return Buffer.from(pdfBytes);
+  return await renderToBuffer(<AnalysisDocument analysis={analysis} />);
 }
 
 // Helper function to split text into lines
