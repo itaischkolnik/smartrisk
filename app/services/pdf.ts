@@ -1,157 +1,107 @@
-import { renderToBuffer, Font, StyleSheet, Document, Page, Text, View } from '@react-pdf/renderer';
+import PDFDocument from 'pdfkit';
 import { Analysis } from '@/types/analysis';
-import type { FC } from 'react';
-
-// Register Arial font
-Font.register({
-  family: 'Arial',
-  src: 'https://cdn.jsdelivr.net/npm/@fontsource/open-sans@4.5.0/files/open-sans-hebrew-400-normal.woff'
-});
-
-// Create styles
-const styles = StyleSheet.create({
-  page: {
-    flexDirection: 'column' as const,
-    backgroundColor: '#ffffff',
-    padding: 30,
-    fontFamily: 'Arial'
-  },
-  section: {
-    margin: 10,
-    padding: 10,
-  },
-  header: {
-    fontSize: 24,
-    marginBottom: 20,
-    textAlign: 'right' as const
-  },
-  title: {
-    fontSize: 18,
-    marginBottom: 10,
-    textAlign: 'right' as const
-  },
-  text: {
-    fontSize: 12,
-    marginBottom: 5,
-    textAlign: 'right' as const
-  },
-  list: {
-    marginLeft: 10
-  }
-});
-
-interface AnalysisDocumentProps {
-  analysis: Analysis;
-}
-
-const AnalysisDocument: FC<AnalysisDocumentProps> = ({ analysis }) => (
-  <Document>
-    <Page size="A4" style={styles.page}>
-      <View style={styles.section}>
-        <Text style={styles.header}>ניתוח סיכונים עסקי</Text>
-        <Text style={styles.text}>תאריך: {new Date().toLocaleDateString('he-IL')}</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.title}>תקציר מנהלים</Text>
-        <Text style={styles.text}>המלצה מהירה: {analysis.content.executiveSummary.quickRecommendation}</Text>
-        {analysis.content.executiveSummary.keyHighlights.map((highlight, index) => (
-          <Text key={index} style={styles.text}>• {highlight}</Text>
-        ))}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.title}>ציוני סיכון</Text>
-        <Text style={styles.text}>ציון סיכון כולל: {analysis.riskScores.overall}/10</Text>
-        <Text style={styles.text}>סיכון עסקי: {analysis.riskScores.business}/10</Text>
-        <Text style={styles.text}>סיכון פיננסי: {analysis.riskScores.financial}/10</Text>
-        <Text style={styles.text}>סיכון שוק: {analysis.riskScores.market}/10</Text>
-        <Text style={styles.text}>סיכון SWOT: {analysis.riskScores.swot}/10</Text>
-      </View>
-    </Page>
-
-    {/* Business Fundamentals */}
-    <Page size="A4" style={styles.page}>
-      <View style={styles.section}>
-        <Text style={styles.title}>{analysis.content.businessFundamentals.title}</Text>
-        <Text style={styles.text}>{analysis.content.businessFundamentals.content}</Text>
-        <Text style={styles.text}>ציון סיכון: {analysis.content.businessFundamentals.riskScore}/10</Text>
-      </View>
-    </Page>
-
-    {/* Financial Analysis */}
-    <Page size="A4" style={styles.page}>
-      <View style={styles.section}>
-        <Text style={styles.title}>{analysis.content.financialAnalysis.title}</Text>
-        <Text style={styles.text}>{analysis.content.financialAnalysis.content}</Text>
-        <Text style={styles.text}>ציון סיכון: {analysis.content.financialAnalysis.riskScore}/10</Text>
-      </View>
-    </Page>
-
-    {/* Market Analysis */}
-    <Page size="A4" style={styles.page}>
-      <View style={styles.section}>
-        <Text style={styles.title}>{analysis.content.marketAnalysis.title}</Text>
-        <Text style={styles.text}>{analysis.content.marketAnalysis.content}</Text>
-        <Text style={styles.text}>ציון סיכון: {analysis.content.marketAnalysis.riskScore}/10</Text>
-      </View>
-    </Page>
-
-    {/* SWOT Analysis */}
-    <Page size="A4" style={styles.page}>
-      <View style={styles.section}>
-        <Text style={styles.title}>{analysis.content.swotAnalysis.title}</Text>
-        <Text style={styles.text}>{analysis.content.swotAnalysis.content}</Text>
-        <Text style={styles.text}>ציון סיכון: {analysis.content.swotAnalysis.riskScore}/10</Text>
-      </View>
-    </Page>
-
-    {/* Recommendations */}
-    <Page size="A4" style={styles.page}>
-      <View style={styles.section}>
-        <Text style={styles.title}>המלצות</Text>
-        
-        <Text style={styles.title}>פעולות מומלצות:</Text>
-        {analysis.content.recommendations.actionItems.map((item, index) => (
-          <Text key={index} style={styles.text}>• {item}</Text>
-        ))}
-
-        <Text style={styles.title}>אסטרטגיות להפחתת סיכון:</Text>
-        {analysis.content.recommendations.riskMitigation.map((item, index) => (
-          <Text key={index} style={styles.text}>• {item}</Text>
-        ))}
-
-        <Text style={styles.title}>שיקולי השקעה:</Text>
-        {analysis.content.recommendations.investmentConsiderations.map((item, index) => (
-          <Text key={index} style={styles.text}>• {item}</Text>
-        ))}
-      </View>
-    </Page>
-  </Document>
-);
 
 export async function generateAnalysisPDF(analysis: Analysis): Promise<Buffer> {
-  return await renderToBuffer(<AnalysisDocument analysis={analysis} />);
-}
+  return new Promise((resolve, reject) => {
+    try {
+      // Create a document
+      const doc = new PDFDocument({
+        size: 'A4',
+        margin: 50,
+        autoFirstPage: true
+      });
 
-// Helper function to split text into lines
-function splitTextToLines(text: string, maxCharsPerLine: number): string[] {
-  const words = text.split(' ');
-  const lines: string[] = [];
-  let currentLine = '';
+      // Collect the PDF data chunks
+      const chunks: Buffer[] = [];
+      doc.on('data', chunk => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
 
-  words.forEach(word => {
-    if (currentLine.length + word.length + 1 <= maxCharsPerLine) {
-      currentLine += (currentLine.length === 0 ? '' : ' ') + word;
-    } else {
-      lines.push(currentLine);
-      currentLine = word;
+      // Set RTL mode
+      doc.addPage({ layout: 'portrait' });
+      
+      // Add header
+      doc.fontSize(24)
+         .text('ניתוח סיכונים עסקי', { align: 'right' })
+         .fontSize(12)
+         .text(`תאריך: ${new Date().toLocaleDateString('he-IL')}`, { align: 'right' })
+         .moveDown();
+
+      // Add executive summary
+      doc.fontSize(18)
+         .text('תקציר מנהלים', { align: 'right' })
+         .fontSize(12)
+         .text(`המלצה מהירה: ${analysis.content.executiveSummary.quickRecommendation}`, { align: 'right' })
+         .moveDown();
+
+      // Add key highlights
+      analysis.content.executiveSummary.keyHighlights.forEach(highlight => {
+        doc.text(`• ${highlight}`, { align: 'right' });
+      });
+      doc.moveDown();
+
+      // Add risk scores
+      doc.fontSize(18)
+         .text('ציוני סיכון', { align: 'right' })
+         .fontSize(12)
+         .text(`ציון סיכון כולל: ${analysis.riskScores.overall}/10`, { align: 'right' })
+         .text(`סיכון עסקי: ${analysis.riskScores.business}/10`, { align: 'right' })
+         .text(`סיכון פיננסי: ${analysis.riskScores.financial}/10`, { align: 'right' })
+         .text(`סיכון שוק: ${analysis.riskScores.market}/10`, { align: 'right' })
+         .text(`סיכון SWOT: ${analysis.riskScores.swot}/10`, { align: 'right' })
+         .moveDown();
+
+      // Add sections
+      const sections = [
+        analysis.content.businessFundamentals,
+        analysis.content.financialAnalysis,
+        analysis.content.marketAnalysis,
+        analysis.content.swotAnalysis,
+      ];
+
+      sections.forEach(section => {
+        doc.addPage();
+        doc.fontSize(18)
+           .text(section.title, { align: 'right' })
+           .moveDown()
+           .fontSize(12)
+           .text(section.content, { align: 'right' })
+           .moveDown()
+           .text(`ציון סיכון: ${section.riskScore}/10`, { align: 'right' });
+      });
+
+      // Add recommendations
+      doc.addPage();
+      doc.fontSize(18)
+         .text('המלצות', { align: 'right' })
+         .moveDown();
+
+      doc.fontSize(14)
+         .text('פעולות מומלצות:', { align: 'right' })
+         .fontSize(12);
+      analysis.content.recommendations.actionItems.forEach(item => {
+        doc.text(`• ${item}`, { align: 'right' });
+      });
+      doc.moveDown();
+
+      doc.fontSize(14)
+         .text('אסטרטגיות להפחתת סיכון:', { align: 'right' })
+         .fontSize(12);
+      analysis.content.recommendations.riskMitigation.forEach(item => {
+        doc.text(`• ${item}`, { align: 'right' });
+      });
+      doc.moveDown();
+
+      doc.fontSize(14)
+         .text('שיקולי השקעה:', { align: 'right' })
+         .fontSize(12);
+      analysis.content.recommendations.investmentConsiderations.forEach(item => {
+        doc.text(`• ${item}`, { align: 'right' });
+      });
+
+      // Finalize the PDF
+      doc.end();
+    } catch (error) {
+      reject(error);
     }
   });
-
-  if (currentLine.length > 0) {
-    lines.push(currentLine);
-  }
-
-  return lines;
 } 
