@@ -5,7 +5,7 @@ import type { FC } from 'react';
 // Register Arial font
 Font.register({
   family: 'Arial',
-  src: 'https://db.onlinewebfonts.com/t/0750a0fb32f886c9e87bab8df9fae5fd.ttf'
+  src: 'https://cdn.jsdelivr.net/npm/@fontsource/open-sans@4.5.0/files/open-sans-hebrew-400-normal.woff'
 });
 
 // Create styles
