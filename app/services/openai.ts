@@ -20,7 +20,8 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<{
   try {
     // Prepare a more concise prompt
     const prompt = `
-      נתח את העסק הבא והערך את הסיכונים. ענה בפורמט JSON בלבד.
+      נתח את העסק הבא והערך את הסיכונים.
+      חשוב: ענה בפורמט JSON בלבד, ללא טקסט נוסף לפני או אחרי ה-JSON.
 
       עסק: ${JSON.stringify({
         details: data.businessDetails,
@@ -29,7 +30,7 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<{
         questionnaire: data.questionnaire
       })}
 
-      מבנה התשובה הנדרש:
+      מבנה ה-JSON הנדרש:
       {
         "executiveSummary": {
           "quickRecommendation": "משפט אחד",
@@ -75,7 +76,7 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<{
       messages: [
         {
           role: "system",
-          content: "אתה יועץ עסקי המתמחה בניתוח סיכונים. ענה בפורמט JSON בלבד."
+          content: "אתה יועץ עסקי המתמחה בניתוח סיכונים. עליך לענות בפורמט JSON בלבד, ללא טקסט נוסף לפני או אחרי. הקפד על תקינות ה-JSON."
         },
         {
           role: "user",
@@ -83,8 +84,7 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<{
         }
       ],
       temperature: 0.5,
-      max_tokens: 2000,
-      response_format: { type: "json_object" }
+      max_tokens: 2000
     });
 
     const content = completion.choices[0].message.content;
@@ -92,24 +92,30 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<{
       throw new Error('OpenAI response content is empty');
     }
 
-    const response = JSON.parse(content);
+    try {
+      const response = JSON.parse(content.trim());
 
-    // Extract and format the response
-    const analysisContent: AnalysisContent = {
-      executiveSummary: response.executiveSummary,
-      businessFundamentals: response.businessFundamentals,
-      financialAnalysis: response.financialAnalysis,
-      marketAnalysis: response.marketAnalysis,
-      swotAnalysis: response.swotAnalysis,
-      recommendations: response.recommendations
-    };
+      // Extract and format the response
+      const analysisContent: AnalysisContent = {
+        executiveSummary: response.executiveSummary,
+        businessFundamentals: response.businessFundamentals,
+        financialAnalysis: response.financialAnalysis,
+        marketAnalysis: response.marketAnalysis,
+        swotAnalysis: response.swotAnalysis,
+        recommendations: response.recommendations
+      };
 
-    const riskScores: RiskScores = response.riskScores;
+      const riskScores: RiskScores = response.riskScores;
 
-    return {
-      content: analysisContent,
-      riskScores
-    };
+      return {
+        content: analysisContent,
+        riskScores
+      };
+    } catch (parseError) {
+      console.error('Error parsing OpenAI response:', parseError);
+      console.error('Raw response:', content);
+      throw new Error('Failed to parse analysis response - invalid JSON format');
+    }
   } catch (error) {
     console.error('Error generating analysis:', error);
     throw error;
