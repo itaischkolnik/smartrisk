@@ -1,121 +1,172 @@
-import PDFDocument from 'pdfkit';
 import { Analysis } from '@/types/analysis';
+import puppeteer from 'puppeteer';
 
 export async function generateAnalysisPDF(analysis: Analysis): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    try {
-      // Create a document with embedded standard fonts
-      const doc = new PDFDocument({
-        autoFirstPage: true,
-        size: 'A4',
-        margin: 50,
-        layout: 'portrait',
-        compress: true,
-        pdfVersion: '1.7',
-        tagged: true,
-        displayTitle: true,
-        lang: 'he',
-        info: {
-          Title: 'ניתוח סיכונים עסקי',
-          Author: 'SmartRisk',
-          Subject: 'Business Risk Analysis',
-          Keywords: 'risk analysis, business, assessment',
-          Creator: 'SmartRisk Platform',
-          Producer: 'PDFKit'
-        }
-      });
+  try {
+    // Launch browser
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
 
-      // Configure document to use RTL for Hebrew
-      doc.text('', { align: 'right' }); // Set default alignment to right
+    const page = await browser.newPage();
 
-      // Collect the PDF data chunks
-      const chunks: any[] = [];
-      doc.on('data', chunk => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
+    // Generate HTML content
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="he">
+      <head>
+        <meta charset="UTF-8">
+        <title>ניתוח סיכונים עסקי - SmartRisk</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            direction: rtl;
+          }
+          .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #333;
+          }
+          h2 {
+            font-size: 20px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            color: #444;
+          }
+          h3 {
+            font-size: 18px;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            color: #555;
+          }
+          p {
+            margin: 10px 0;
+            color: #666;
+          }
+          .risk-score {
+            font-weight: bold;
+            color: #444;
+          }
+          .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+          }
+          ul {
+            list-style-type: none;
+            padding: 0;
+          }
+          li {
+            margin: 5px 0;
+            padding-right: 20px;
+            position: relative;
+          }
+          li:before {
+            content: "•";
+            position: absolute;
+            right: 0;
+            color: #666;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>ניתוח סיכונים עסקי</h1>
+          <p>תאריך: ${new Date().toLocaleDateString('he-IL')}</p>
 
-      // Add content with RTL support
-      doc.fontSize(20)
-         .text('ניתוח סיכונים עסקי', { align: 'right', continued: false })
-         .fontSize(12)
-         .text(`תאריך: ${new Date().toLocaleDateString('he-IL')}`, { align: 'right', continued: false })
-         .moveDown();
+          <h2>תקציר מנהלים</h2>
+          <p><strong>המלצה מהירה:</strong> ${analysis.content.executiveSummary.quickRecommendation}</p>
+          
+          <h3>נקודות מפתח:</h3>
+          <ul>
+            ${analysis.content.executiveSummary.keyHighlights
+              .map(highlight => `<li>${highlight}</li>`)
+              .join('')}
+          </ul>
 
-      // Executive Summary
-      doc.fontSize(16)
-         .text('תקציר מנהלים', { align: 'right', continued: false })
-         .fontSize(12)
-         .text(`המלצה מהירה: ${analysis.content.executiveSummary.quickRecommendation}`, { align: 'right', continued: false })
-         .moveDown();
+          <h2>ציוני סיכון</h2>
+          <p class="risk-score">ציון סיכון כולל: ${analysis.riskScores.overall}/10</p>
+          <p class="risk-score">סיכון עסקי: ${analysis.riskScores.business}/10</p>
+          <p class="risk-score">סיכון פיננסי: ${analysis.riskScores.financial}/10</p>
+          <p class="risk-score">סיכון שוק: ${analysis.riskScores.market}/10</p>
+          <p class="risk-score">סיכון SWOT: ${analysis.riskScores.swot}/10</p>
 
-      doc.text('נקודות מפתח:', { align: 'right', continued: false });
-      analysis.content.executiveSummary.keyHighlights.forEach(highlight => {
-        doc.text(`• ${highlight}`, { align: 'right', continued: false });
-      });
-      doc.moveDown();
+          <h2>${analysis.content.businessFundamentals.title}</h2>
+          <p>${analysis.content.businessFundamentals.content}</p>
+          <p class="risk-score">ציון סיכון: ${analysis.content.businessFundamentals.riskScore}/10</p>
 
-      // Risk Scores
-      doc.fontSize(16)
-         .text('ציוני סיכון', { align: 'right', continued: false })
-         .fontSize(12)
-         .text(`ציון סיכון כולל: ${analysis.riskScores.overall}/10`, { align: 'right', continued: false })
-         .text(`סיכון עסקי: ${analysis.riskScores.business}/10`, { align: 'right', continued: false })
-         .text(`סיכון פיננסי: ${analysis.riskScores.financial}/10`, { align: 'right', continued: false })
-         .text(`סיכון שוק: ${analysis.riskScores.market}/10`, { align: 'right', continued: false })
-         .text(`סיכון SWOT: ${analysis.riskScores.swot}/10`, { align: 'right', continued: false })
-         .moveDown();
+          <h2>${analysis.content.financialAnalysis.title}</h2>
+          <p>${analysis.content.financialAnalysis.content}</p>
+          <p class="risk-score">ציון סיכון: ${analysis.content.financialAnalysis.riskScore}/10</p>
 
-      // Add sections
-      const sections = [
-        analysis.content.businessFundamentals,
-        analysis.content.financialAnalysis,
-        analysis.content.marketAnalysis,
-        analysis.content.swotAnalysis,
-      ];
+          <h2>${analysis.content.marketAnalysis.title}</h2>
+          <p>${analysis.content.marketAnalysis.content}</p>
+          <p class="risk-score">ציון סיכון: ${analysis.content.marketAnalysis.riskScore}/10</p>
 
-      sections.forEach(section => {
-        doc.addPage()
-           .fontSize(16)
-           .text(section.title, { align: 'right', continued: false })
-           .moveDown()
-           .fontSize(12)
-           .text(section.content, { align: 'right', continued: false })
-           .moveDown()
-           .text(`ציון סיכון: ${section.riskScore}/10`, { align: 'right', continued: false });
-      });
+          <h2>${analysis.content.swotAnalysis.title}</h2>
+          <p>${analysis.content.swotAnalysis.content}</p>
+          <p class="risk-score">ציון סיכון: ${analysis.content.swotAnalysis.riskScore}/10</p>
 
-      // Add recommendations
-      doc.addPage()
-         .fontSize(16)
-         .text('המלצות', { align: 'right', continued: false })
-         .moveDown()
-         .fontSize(12)
-         .text('פעולות מומלצות:', { align: 'right', continued: false });
+          <h2>המלצות</h2>
+          <h3>פעולות מומלצות:</h3>
+          <ul>
+            ${analysis.content.recommendations.actionItems
+              .map(item => `<li>${item}</li>`)
+              .join('')}
+          </ul>
 
-      analysis.content.recommendations.actionItems.forEach(item => {
-        doc.text(`• ${item}`, { align: 'right', continued: false });
-      });
-      doc.moveDown();
+          <h3>אסטרטגיות להפחתת סיכון:</h3>
+          <ul>
+            ${analysis.content.recommendations.riskMitigation
+              .map(item => `<li>${item}</li>`)
+              .join('')}
+          </ul>
 
-      doc.text('אסטרטגיות להפחתת סיכון:', { align: 'right', continued: false });
-      analysis.content.recommendations.riskMitigation.forEach(item => {
-        doc.text(`• ${item}`, { align: 'right', continued: false });
-      });
-      doc.moveDown();
+          <h3>שיקולי השקעה:</h3>
+          <ul>
+            ${analysis.content.recommendations.investmentConsiderations
+              .map(item => `<li>${item}</li>`)
+              .join('')}
+          </ul>
 
-      doc.text('שיקולי השקעה:', { align: 'right', continued: false });
-      analysis.content.recommendations.investmentConsiderations.forEach(item => {
-        doc.text(`• ${item}`, { align: 'right', continued: false });
-      });
+          <div class="footer">
+            <p>© SmartRisk. כל הזכויות שמורות.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
 
-      // Add footer
-      doc.fontSize(10)
-         .text('© SmartRisk. כל הזכויות שמורות.', { align: 'center', continued: false });
+    // Set content and generate PDF
+    await page.setContent(htmlContent);
+    
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '20px',
+        right: '20px',
+        bottom: '20px',
+        left: '20px'
+      },
+      preferCSSPageSize: true
+    });
 
-      // Finalize the PDF
-      doc.end();
-    } catch (error) {
-      console.error('PDF Generation Error:', error);
-      reject(error);
-    }
-  });
+    await browser.close();
+    return pdfBuffer;
+
+  } catch (error) {
+    console.error('PDF Generation Error:', error);
+    throw error;
+  }
 } 
