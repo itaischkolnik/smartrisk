@@ -50,10 +50,13 @@ export async function POST(
         // Update status to processing
         await supabase
           .from('analyses')
-          .update({ status: 'processing' })
+          .update({ 
+            status: 'processing',
+            updated_at: new Date().toISOString()
+          })
           .eq('id', analysis.id);
 
-        // Fetch all necessary data
+        // Step 1: Fetch all necessary data
         const [
           { data: assessmentData },
           { data: financialData },
@@ -76,7 +79,11 @@ export async function POST(
             .eq('assessment_id', assessmentId)
         ]);
 
-        // Generate analysis using OpenAI
+        if (!assessmentData) {
+          throw new Error('Assessment data not found');
+        }
+
+        // Step 2: Generate analysis using OpenAI
         const { content, riskScores } = await generateBusinessAnalysis({
           businessDetails: assessmentData,
           financialData: financialData?.data || {},
@@ -85,7 +92,21 @@ export async function POST(
           files: files || [],
         });
 
-        // Generate PDF
+        // Update progress after analysis generation
+        await supabase
+          .from('analyses')
+          .update({
+            analysis_content: content,
+            overall_risk_score: riskScores.overall,
+            business_risk_score: riskScores.business,
+            financial_risk_score: riskScores.financial,
+            market_risk_score: riskScores.market,
+            swot_risk_score: riskScores.swot,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', analysis.id);
+
+        // Step 3: Generate PDF
         const pdfBuffer = await generateAnalysisPDF({
           id: analysis.id,
           assessmentId,
@@ -97,7 +118,7 @@ export async function POST(
           updatedAt: new Date().toISOString(),
         });
 
-        // Upload PDF to storage
+        // Step 4: Upload PDF to storage
         const pdfFileName = `${userId}/${assessmentId}/analysis.pdf`;
         const { data: uploadData, error: uploadError } = await supabase
           .storage
@@ -105,6 +126,7 @@ export async function POST(
           .upload(pdfFileName, pdfBuffer, {
             contentType: 'application/pdf',
             cacheControl: '3600',
+            upsert: true
           });
 
         if (uploadError) {
@@ -117,22 +139,17 @@ export async function POST(
           .from('assessment-files')
           .getPublicUrl(pdfFileName);
 
-        // Update analysis record with results
+        // Step 5: Update analysis record with results
         await supabase
           .from('analyses')
           .update({
             status: 'completed',
-            analysis_content: content,
-            overall_risk_score: riskScores.overall,
-            business_risk_score: riskScores.business,
-            financial_risk_score: riskScores.financial,
-            market_risk_score: riskScores.market,
-            swot_risk_score: riskScores.swot,
             pdf_url: publicUrl,
+            updated_at: new Date().toISOString()
           })
           .eq('id', analysis.id);
 
-        // Send email with analysis
+        // Step 6: Send email with analysis
         if (session.user.email) {
           await sendAnalysisEmail(
             session.user.email,
@@ -160,6 +177,7 @@ export async function POST(
           .update({
             status: 'failed',
             error_message: error instanceof Error ? error.message : 'An unknown error occurred',
+            updated_at: new Date().toISOString()
           })
           .eq('id', analysis.id);
       }

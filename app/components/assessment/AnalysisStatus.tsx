@@ -13,6 +13,10 @@ interface StatusResponse {
   time_elapsed_seconds: number;
   last_update_seconds: number;
   is_stuck: boolean;
+  progress?: {
+    step: string;
+    details: string;
+  };
 }
 
 export default function AnalysisStatus({ assessmentId }: AnalysisStatusProps) {
@@ -48,6 +52,12 @@ export default function AnalysisStatus({ assessmentId }: AnalysisStatusProps) {
     return () => clearInterval(interval);
   }, [assessmentId, status?.status]);
 
+  const formatTime = (seconds: number) => {
+    if (seconds < 60) return `${seconds} שניות`;
+    const minutes = Math.floor(seconds / 60);
+    return `${minutes} דקות`;
+  };
+
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
@@ -67,75 +77,81 @@ export default function AnalysisStatus({ assessmentId }: AnalysisStatusProps) {
     );
   }
 
-  const formatTime = (seconds: number) => {
-    if (seconds < 60) return `${seconds} שניות`;
-    const minutes = Math.floor(seconds / 60);
-    return `${minutes} דקות`;
-  };
-
   const getStatusDisplay = () => {
     switch (status.status) {
       case 'pending':
         return {
-          icon: <FiClock className="h-5 w-5 text-yellow-500" />,
-          text: 'ממתין לניתוח...',
-          color: 'yellow'
+          icon: <FiClock className="h-5 w-5 text-gray-500 ml-2" />,
+          text: 'ממתין לעיבוד...',
+          bgColor: 'bg-gray-50',
+          borderColor: 'border-gray-200',
+          textColor: 'text-gray-700'
         };
       case 'processing':
         return {
-          icon: <FiRefreshCw className="animate-spin h-5 w-5 text-blue-500" />,
-          text: 'מנתח...',
-          color: 'blue'
+          icon: <FiRefreshCw className="animate-spin h-5 w-5 text-blue-500 ml-2" />,
+          text: 'מנתח את העסק...',
+          bgColor: 'bg-blue-50',
+          borderColor: 'border-blue-200',
+          textColor: 'text-blue-700'
         };
       case 'completed':
         return {
-          icon: <FiCheckCircle className="h-5 w-5 text-green-500" />,
-          text: 'הניתוח הושלם',
-          color: 'green'
+          icon: <FiCheckCircle className="h-5 w-5 text-green-500 ml-2" />,
+          text: 'הניתוח הושלם!',
+          bgColor: 'bg-green-50',
+          borderColor: 'border-green-200',
+          textColor: 'text-green-700'
         };
       case 'failed':
         return {
-          icon: <FiAlertCircle className="h-5 w-5 text-red-500" />,
+          icon: <FiAlertCircle className="h-5 w-5 text-red-500 ml-2" />,
           text: 'הניתוח נכשל',
-          color: 'red'
+          bgColor: 'bg-red-50',
+          borderColor: 'border-red-200',
+          textColor: 'text-red-700'
         };
       default:
         return {
-          icon: <FiAlertCircle className="h-5 w-5 text-gray-500" />,
-          text: 'סטטוס לא ידוע',
-          color: 'gray'
+          icon: <FiClock className="h-5 w-5 text-gray-500 ml-2" />,
+          text: 'מצב לא ידוע',
+          bgColor: 'bg-gray-50',
+          borderColor: 'border-gray-200',
+          textColor: 'text-gray-700'
         };
     }
   };
 
   const statusDisplay = getStatusDisplay();
-  const bgColor = `bg-${statusDisplay.color}-50`;
-  const borderColor = `border-${statusDisplay.color}-200`;
-  const textColor = `text-${statusDisplay.color}-700`;
 
   return (
-    <div className={`${bgColor} border ${borderColor} ${textColor} px-4 py-3 rounded-lg`}>
-      <div className="flex items-center space-x-2">
+    <div className={`${statusDisplay.bgColor} border ${statusDisplay.borderColor} ${statusDisplay.textColor} px-4 py-3 rounded-lg`}>
+      <div className="flex items-center mb-2">
         {statusDisplay.icon}
-        <span className="ml-2">{statusDisplay.text}</span>
-        {status.status === 'processing' && (
-          <span className="text-sm text-gray-500">
-            ({formatTime(status.time_elapsed_seconds)})
-          </span>
-        )}
+        <span className="font-medium">{statusDisplay.text}</span>
       </div>
       
-      {status.is_stuck && (
-        <div className="mt-2 text-sm text-red-600">
-          <FiAlertCircle className="inline-block h-4 w-4 mr-1" />
-          נראה שהניתוח נתקע. אנא נסה שוב או צור קשר עם התמיכה.
+      {status.status === 'processing' && (
+        <div className="text-sm">
+          <p>זמן שחלף: {formatTime(status.time_elapsed_seconds)}</p>
+          {status.progress && (
+            <p className="mt-1">
+              {status.progress.step}: {status.progress.details}
+            </p>
+          )}
         </div>
       )}
-      
+
       {status.status === 'failed' && status.error_message && (
-        <div className="mt-2 text-sm">
+        <p className="text-sm mt-1">
           שגיאה: {status.error_message}
-        </div>
+        </p>
+      )}
+
+      {status.is_stuck && (
+        <p className="text-sm mt-1 text-yellow-600">
+          נראה שהניתוח נתקע. אנא נסה שוב או צור קשר עם התמיכה.
+        </p>
       )}
     </div>
   );
