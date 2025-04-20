@@ -4,17 +4,15 @@ import { Analysis } from '@/types/analysis';
 export async function generateAnalysisPDF(analysis: Analysis): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
-      // Create a document with Arial font configuration
+      // Create a document with default Helvetica font
       const doc = new PDFDocument({
         autoFirstPage: true,
         size: 'A4',
         margin: 50,
-        layout: 'portrait',
-        font: 'Arial'
+        layout: 'portrait'
       });
 
       // Configure document to use RTL for Hebrew
-      doc.font('Arial');
       doc.text('', 0, 0, { align: 'right' }); // Set default alignment to right
 
       // Collect the PDF data chunks
