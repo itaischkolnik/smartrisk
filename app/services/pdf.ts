@@ -4,34 +4,48 @@ import { Analysis } from '@/types/analysis';
 export async function generateAnalysisPDF(analysis: Analysis): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
-      // Create a document without any font configuration
+      // Create a document with Arial font configuration
       const doc = new PDFDocument({
         autoFirstPage: true,
         size: 'A4',
         margin: 50,
-        layout: 'portrait'
+        layout: 'portrait',
+        font: 'Arial'
       });
+
+      // Configure document to use RTL for Hebrew
+      doc.font('Arial');
+      doc.text('', 0, 0, { align: 'right' }); // Set default alignment to right
 
       // Collect the PDF data chunks
       const chunks: any[] = [];
       doc.on('data', chunk => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
 
-      // Add content without any font specifications
-      doc.text('ניתוח סיכונים עסקי', { align: 'right' })
+      // Add content with RTL support
+      doc.fontSize(20)
+         .text('ניתוח סיכונים עסקי', { align: 'right' })
+         .fontSize(12)
          .text(`תאריך: ${new Date().toLocaleDateString('he-IL')}`, { align: 'right' })
          .moveDown();
 
-      doc.text('תקציר מנהלים', { align: 'right' })
+      // Executive Summary
+      doc.fontSize(16)
+         .text('תקציר מנהלים', { align: 'right' })
+         .fontSize(12)
          .text(`המלצה מהירה: ${analysis.content.executiveSummary.quickRecommendation}`, { align: 'right' })
          .moveDown();
 
+      doc.text('נקודות מפתח:', { align: 'right' });
       analysis.content.executiveSummary.keyHighlights.forEach(highlight => {
         doc.text(`• ${highlight}`, { align: 'right' });
       });
       doc.moveDown();
 
-      doc.text('ציוני סיכון', { align: 'right' })
+      // Risk Scores
+      doc.fontSize(16)
+         .text('ציוני סיכון', { align: 'right' })
+         .fontSize(12)
          .text(`ציון סיכון כולל: ${analysis.riskScores.overall}/10`, { align: 'right' })
          .text(`סיכון עסקי: ${analysis.riskScores.business}/10`, { align: 'right' })
          .text(`סיכון פיננסי: ${analysis.riskScores.financial}/10`, { align: 'right' })
@@ -49,8 +63,10 @@ export async function generateAnalysisPDF(analysis: Analysis): Promise<Buffer> {
 
       sections.forEach(section => {
         doc.addPage()
+           .fontSize(16)
            .text(section.title, { align: 'right' })
            .moveDown()
+           .fontSize(12)
            .text(section.content, { align: 'right' })
            .moveDown()
            .text(`ציון סיכון: ${section.riskScore}/10`, { align: 'right' });
@@ -58,8 +74,10 @@ export async function generateAnalysisPDF(analysis: Analysis): Promise<Buffer> {
 
       // Add recommendations
       doc.addPage()
+         .fontSize(16)
          .text('המלצות', { align: 'right' })
          .moveDown()
+         .fontSize(12)
          .text('פעולות מומלצות:', { align: 'right' });
 
       analysis.content.recommendations.actionItems.forEach(item => {
@@ -77,6 +95,10 @@ export async function generateAnalysisPDF(analysis: Analysis): Promise<Buffer> {
       analysis.content.recommendations.investmentConsiderations.forEach(item => {
         doc.text(`• ${item}`, { align: 'right' });
       });
+
+      // Add footer
+      doc.fontSize(10)
+         .text('© SmartRisk. כל הזכויות שמורות.', { align: 'center' });
 
       // Finalize the PDF
       doc.end();
