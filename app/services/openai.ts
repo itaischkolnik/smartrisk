@@ -17,6 +17,9 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<{
   content: AnalysisContent;
   riskScores: RiskScores;
 }> {
+  const startTime = Date.now();
+  console.log('Starting business analysis...');
+  
   try {
     // Prepare a more concise prompt
     const prompt = `
@@ -71,6 +74,7 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<{
       }
     `;
 
+    console.log('Sending request to OpenAI...', Date.now() - startTime, 'ms');
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
       messages: [
@@ -87,12 +91,14 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<{
       max_tokens: 2000
     });
 
+    console.log('Received response from OpenAI', Date.now() - startTime, 'ms');
     const content = completion.choices[0].message.content;
     if (!content) {
       throw new Error('OpenAI response content is empty');
     }
 
     try {
+      console.log('Parsing JSON response...', Date.now() - startTime, 'ms');
       const response = JSON.parse(content.trim());
 
       // Extract and format the response
@@ -107,6 +113,7 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<{
 
       const riskScores: RiskScores = response.riskScores;
 
+      console.log('Analysis completed successfully', Date.now() - startTime, 'ms');
       return {
         content: analysisContent,
         riskScores
@@ -117,7 +124,7 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<{
       throw new Error('Failed to parse analysis response - invalid JSON format');
     }
   } catch (error) {
-    console.error('Error generating analysis:', error);
+    console.error('Error generating analysis:', error, 'Time elapsed:', Date.now() - startTime, 'ms');
     throw error;
   }
 } 

@@ -1,12 +1,15 @@
 import { Analysis } from '@/types/analysis';
-import puppeteer from 'puppeteer';
+import chromium from 'chrome-aws-lambda';
 
 export async function generateAnalysisPDF(analysis: Analysis): Promise<Buffer> {
   try {
-    // Launch browser
-    const browser = await puppeteer.launch({
+    // Launch browser with chrome-aws-lambda
+    const browser = await chromium.puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath,
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      ignoreHTTPSErrors: true,
     });
 
     const page = await browser.newPage();
@@ -76,6 +79,16 @@ export async function generateAnalysisPDF(analysis: Analysis): Promise<Buffer> {
             position: absolute;
             right: 0;
             color: #666;
+          }
+          @page {
+            size: A4;
+            margin: 20mm;
+          }
+          @media print {
+            body {
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
           }
         </style>
       </head>
