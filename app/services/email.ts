@@ -1,69 +1,78 @@
-import { EmailConfig } from '@/types/email';
-import sgMail from '@sendgrid/mail';
+import nodemailer from 'nodemailer';
 
-if (!process.env.SENDGRID_API_KEY) {
-  throw new Error('SENDGRID_API_KEY environment variable is not set');
+interface EmailConfig {
+  to: string;
+  subject: string;
+  businessName?: string;
+  businessType?: string;
+  riskScore?: number;
+  analysis: string;
 }
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+interface EmailResult {
+  success: boolean;
+  error?: any;
+}
 
-export const formatAnalysisResults = (results: any) => {
-  const sections = [
-    { title: 'Risk Assessment', data: results.riskAssessment },
-    { title: 'Recommendations', data: results.recommendations },
-    { title: 'Market Analysis', data: results.marketAnalysis },
-    { title: 'Financial Analysis', data: results.financialAnalysis }
-  ];
+// Create reusable transporter object using SMTP config
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  }
+});
 
-  let htmlContent = `
-    <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          h1 { color: #2c5282; }
-          h2 { color: #4a5568; margin-top: 20px; }
-          p { margin: 10px 0; }
-          .section { margin-bottom: 30px; }
-        </style>
-      </head>
-      <body>
-        <h1>SmartRisk Analysis Results</h1>
-  `;
-
-  sections.forEach(section => {
-    if (section.data) {
-      htmlContent += `
-        <div class="section">
-          <h2>${section.title}</h2>
-          <p>${section.data}</p>
-        </div>
-      `;
-    }
-  });
-
-  htmlContent += `
-      </body>
-    </html>
-  `;
-
-  return htmlContent;
-};
-
-export const sendEmail = async (config: EmailConfig, subject: string, analysisResults: any) => {
-  const htmlContent = formatAnalysisResults(analysisResults);
-
-  const msg = {
-    to: config.to,
-    from: config.from,
-    subject: subject,
-    html: htmlContent,
-  };
-
+export async function sendEmail(config: EmailConfig): Promise<EmailResult> {
   try {
-    await sgMail.send(msg);
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      throw new Error('SMTP credentials are not set');
+    }
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #333;">SmartRisk Assessment Results</h1>
+        
+        <div style="margin: 20px 0;">
+          <h2 style="color: #444;">Business Details</h2>
+          <p><strong>Business Name:</strong> ${config.businessName || 'Not specified'}</p>
+          <p><strong>Business Type:</strong> ${config.businessType || 'Not specified'}</p>
+        </div>
+
+        ${config.riskScore !== undefined ? `
+          <div style="margin: 20px 0;">
+            <h2 style="color: #444;">Risk Score</h2>
+            <p><strong>${config.riskScore}/100</strong></p>
+            <p style="color: #666; font-size: 0.9em;">(0 = High Risk, 100 = Low Risk)</p>
+          </div>
+        ` : ''}
+
+        <div style="margin: 20px 0;">
+          <h2 style="color: #444;">Analysis</h2>
+          <div style="white-space: pre-line;">${config.analysis}</div>
+        </div>
+
+        <hr style="margin: 30px 0;" />
+        <p style="color: #666; font-size: 0.8em; text-align: center;">
+          This is an automated email from SmartRisk. Please do not reply to this email.
+        </p>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: process.env.SMTP_FROM,
+      to: config.to,
+      subject: config.subject,
+      html: htmlContent
+    };
+
+    await transporter.sendMail(mailOptions);
     return { success: true };
+
   } catch (error) {
     console.error('Error sending email:', error);
     return { success: false, error };
   }
-}; 
+} 
