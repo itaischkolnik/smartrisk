@@ -12,6 +12,15 @@ interface AnalysisResult {
   riskScore: number;
 }
 
+// Create a promise with timeout
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]);
+}
+
 export async function generateBusinessAnalysis(data: BusinessData): Promise<AnalysisResult> {
   // Check if OpenAI API key is set
   if (!process.env.OPENAI_API_KEY) {
@@ -39,26 +48,32 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
     3. Recommendations
     4. Action Items
     
-    Also calculate a risk score from 0-100 (where 100 is lowest risk).`;
+    Also calculate a risk score from 0-100 (where 100 is lowest risk).
+    
+    Important: Keep the response concise and focused on key insights.`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
-      messages: [
-        {
-          role: "system",
-          content: "You are a business risk analysis expert. Provide detailed analysis and concrete recommendations."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 2000
-    });
+    // Set a 25-second timeout for the OpenAI API call
+    const response = await withTimeout(
+      openai.chat.completions.create({
+        model: "gpt-4-turbo-preview",
+        messages: [
+          {
+            role: "system",
+            content: "You are a business risk analysis expert. Provide detailed analysis and concrete recommendations."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1500 // Reduced token limit for faster response
+      }),
+      25000 // 25 seconds timeout
+    );
 
     if (!response.choices[0]?.message?.content) {
-      throw new Error('No response from OpenAI');
+      throw new Error('No response received from OpenAI');
     }
 
     // Extract risk score from the content (assuming it's mentioned in the text)
@@ -73,6 +88,11 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
 
   } catch (error) {
     console.error('Error calling OpenAI:', error);
+    if (error instanceof Error) {
+      if (error.message.includes('timed out')) {
+        throw new Error('Analysis is taking longer than expected. Please try again.');
+      }
+    }
     throw error;
   }
 } 
