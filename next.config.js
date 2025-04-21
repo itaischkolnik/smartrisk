@@ -4,7 +4,7 @@ const nextConfig = {
     serverActions: true,
   },
   images: {
-    domains: ['avatars.githubusercontent.com'],
+    domains: ['avatars.githubusercontent.com', 'lh3.googleusercontent.com', 'googleusercontent.com'],
   },
   webpack: (config) => {
     // Handle puppeteer in serverless environment
