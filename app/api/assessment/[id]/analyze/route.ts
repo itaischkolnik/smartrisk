@@ -5,8 +5,8 @@ import { generateAnalysisPDF } from '@/services/pdf';
 import { sendEmail } from '../../../../services/email';
 import { AnalysisStatus } from '@/types/analysis';
 
-// Set timeout for the API route (30 seconds)
-export const maxDuration = 30;
+// Set timeout for the API route (90 seconds)
+export const maxDuration = 90;
 
 // Configure runtime
 export const runtime = 'edge';
@@ -96,17 +96,22 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
       // Step 5: Send email with analysis
       if (session.user.email) {
-        const { success: emailSent, error: emailError } = await sendEmail({
-          to: session.user.email,
-          subject: `SmartRisk Analysis - ${assessment.business_details?.business_name || 'Your Business'}`,
-          businessName: assessment.business_details?.business_name,
-          businessType: assessment.business_details?.business_type,
-          riskScore: riskScore,
-          analysis: content
-        });
+        try {
+          const { success: emailSent, error: emailError } = await sendEmail({
+            to: session.user.email,
+            subject: `SmartRisk Analysis - ${assessment.business_details?.business_name || 'Your Business'}`,
+            businessName: assessment.business_details?.business_name,
+            businessType: assessment.business_details?.business_type,
+            riskScore: riskScore,
+            analysis: content
+          });
 
-        if (!emailSent) {
-          console.error('Error sending email:', emailError);
+          if (!emailSent && emailError) {
+            console.error('Error sending email:', emailError);
+          }
+        } catch (emailError) {
+          console.error('Error in email service:', emailError);
+          // Continue with the response even if email fails
         }
       }
 
@@ -117,6 +122,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
       });
 
     } catch (analysisError) {
+      console.error('Analysis error:', analysisError);
+      
       // Update assessment status to failed if analysis fails
       await supabase
         .from('assessments')
@@ -126,13 +133,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
         })
         .eq('id', assessmentId);
 
-      throw analysisError;
+      return NextResponse.json(
+        { error: analysisError instanceof Error ? analysisError.message : 'Analysis failed' },
+        { status: 500 }
+      );
     }
 
   } catch (error) {
     console.error('Error in analysis endpoint:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { 
+        error: error instanceof Error ? error.message : 'Internal server error',
+        details: error instanceof Error ? error.stack : undefined
+      },
       { status: 500 }
     );
   }

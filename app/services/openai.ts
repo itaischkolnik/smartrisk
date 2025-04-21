@@ -24,11 +24,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 export async function generateBusinessAnalysis(data: BusinessData): Promise<AnalysisResult> {
   // Check if OpenAI API key is set
   if (!process.env.OPENAI_API_KEY) {
-    console.warn('OpenAI API key not found, using mock implementation');
-    return {
-      content: 'This is a mock analysis. Please set up your OpenAI API key for real analysis.',
-      riskScore: 50
-    };
+    throw new Error('OpenAI API key is not configured. Please set the OPENAI_API_KEY environment variable.');
   }
 
   const openai = new OpenAI({
@@ -50,9 +46,10 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
     
     Also calculate a risk score from 0-100 (where 100 is lowest risk).
     
-    Important: Keep the response concise and focused on key insights.`;
+    Important: Keep the response concise and focused on key insights.
+    Make sure to include a clear risk score in the format 'Risk Score: X' where X is a number between 0 and 100.`;
 
-    // Set a 25-second timeout for the OpenAI API call
+    // Set a 60-second timeout for the OpenAI API call
     const response = await withTimeout(
       openai.chat.completions.create({
         model: "gpt-4-turbo-preview",
@@ -69,17 +66,31 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
         temperature: 0.7,
         max_tokens: 1500 // Reduced token limit for faster response
       }),
-      25000 // 25 seconds timeout
+      60000 // 60 seconds overall timeout
     );
 
-    if (!response.choices[0]?.message?.content) {
-      throw new Error('No response received from OpenAI');
+    const content = response.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error('No response content received from OpenAI');
     }
 
-    // Extract risk score from the content (assuming it's mentioned in the text)
-    const content = response.choices[0].message.content;
+    // Extract risk score from the content
     const riskScoreMatch = content.match(/risk score:?\s*(\d+)/i);
+    
+    if (!riskScoreMatch) {
+      console.warn('Risk score not found in OpenAI response, using default score');
+    }
+    
     const riskScore = riskScoreMatch ? parseInt(riskScoreMatch[1]) : 50;
+
+    // Validate risk score is within bounds
+    if (isNaN(riskScore) || riskScore < 0 || riskScore > 100) {
+      console.warn('Invalid risk score received, using default score');
+      return {
+        content,
+        riskScore: 50
+      };
+    }
 
     return {
       content,
@@ -88,11 +99,17 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
 
   } catch (error) {
     console.error('Error calling OpenAI:', error);
+    
     if (error instanceof Error) {
       if (error.message.includes('timed out')) {
-        throw new Error('Analysis is taking longer than expected. Please try again.');
+        throw new Error('The analysis is taking longer than expected. Please try again. If this persists, try breaking down your input into smaller sections.');
       }
+      
+      // Throw the original error with more context
+      throw new Error(`Failed to generate analysis: ${error.message}`);
     }
-    throw error;
+    
+    // For unknown errors
+    throw new Error('An unexpected error occurred while generating the analysis');
   }
 } 
