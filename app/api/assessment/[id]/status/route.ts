@@ -19,44 +19,41 @@ export async function GET(
 
     const assessmentId = params.id;
 
-    // Get the analysis status
-    const { data: analysis, error } = await supabase
-      .from('analyses')
-      .select('status, error_message, created_at, updated_at')
-      .eq('assessment_id', assessmentId)
-      .order('created_at', { ascending: false })
-      .limit(1)
+    // Get the assessment status
+    const { data: assessment, error } = await supabase
+      .from('assessments')
+      .select('status, created_at, updated_at')
+      .eq('id', assessmentId)
       .single();
 
     if (error) {
-      console.error('Error fetching analysis status:', error);
+      console.error('Error fetching assessment status:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch analysis status' },
+        { error: 'Failed to fetch assessment status' },
         { status: 500 }
       );
     }
 
-    if (!analysis) {
+    if (!assessment) {
       return NextResponse.json(
-        { error: 'Analysis not found' },
+        { error: 'Assessment not found' },
         { status: 404 }
       );
     }
 
     // Calculate time elapsed
-    const startTime = new Date(analysis.created_at).getTime();
-    const lastUpdateTime = new Date(analysis.updated_at).getTime();
+    const startTime = new Date(assessment.created_at).getTime();
+    const lastUpdateTime = new Date(assessment.updated_at).getTime();
     const currentTime = new Date().getTime();
     
     const timeElapsedSeconds = Math.floor((currentTime - startTime) / 1000);
     const lastUpdateSeconds = Math.floor((currentTime - lastUpdateTime) / 1000);
 
     // If status is 'processing' and no updates for more than 5 minutes, consider it stuck
-    const isStuck = analysis.status === 'processing' && lastUpdateSeconds > 300;
+    const isStuck = assessment.status === 'processing' && lastUpdateSeconds > 300;
 
     return NextResponse.json({
-      status: analysis.status,
-      error_message: analysis.error_message,
+      status: assessment.status,
       time_elapsed_seconds: timeElapsedSeconds,
       last_update_seconds: lastUpdateSeconds,
       is_stuck: isStuck
