@@ -1,6 +1,14 @@
 {
   "version": 2,
-  "buildCommand": "next build",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
   "outputDirectory": ".next",
   "regions": ["iad1"],
   "github": {
