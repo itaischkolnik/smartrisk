@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient } from '../../../../lib/supabase/server';
 
 function sanitizeFileName(fileName: string): string {
   // Remove any path components

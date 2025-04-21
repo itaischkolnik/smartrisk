@@ -1,24 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
-import { sendEmail } from '@/app/services/email';
-
-// Create a Supabase server client
-const createServerSupabaseClient = () => {
-  const cookieStore = cookies();
-  
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-    {
-      global: {
-        headers: {
-          cookie: cookieStore.toString(),
-        },
-      },
-    }
-  );
-};
+import { createServerSupabaseClient } from '../../../lib/supabase/server';
+import { sendEmail } from '../../../services/email';
 
 export async function POST(request: Request) {
   try {
@@ -44,14 +26,6 @@ export async function POST(request: Request) {
     }
 
     const userId = session.user.id;
-    const userEmail = session.user.email;
-
-    if (!userEmail) {
-      return NextResponse.json(
-        { error: 'User email not found' },
-        { status: 400 }
-      );
-    }
 
     // Fetch the assessment with analysis
     const { data: assessment, error: assessmentError } = await supabase
@@ -77,10 +51,16 @@ export async function POST(request: Request) {
     }
 
     // Send email with analysis
-    const subject = `SmartRisk Assessment Analysis - ${assessment.business_details?.business_name || 'Your Business'}`;
-    const { success, error } = await sendEmail({
-      to: userEmail,
-      subject,
+    if (!session.user.email) {
+      return NextResponse.json(
+        { error: 'User email not found' },
+        { status: 400 }
+      );
+    }
+
+    const { success, error: emailError } = await sendEmail({
+      to: session.user.email,
+      subject: `SmartRisk Analysis - ${assessment.business_details?.business_name || 'Your Business'}`,
       businessName: assessment.business_details?.business_name,
       businessType: assessment.business_details?.business_type,
       riskScore: assessment.risk_score,
@@ -88,7 +68,7 @@ export async function POST(request: Request) {
     });
 
     if (!success) {
-      console.error('Error sending email:', error);
+      console.error('Error sending email:', emailError);
       return NextResponse.json(
         { error: 'Failed to send email' },
         { status: 500 }
