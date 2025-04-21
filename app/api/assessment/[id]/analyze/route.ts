@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { generateBusinessAnalysis } from '@/services/openai';
 import { generateAnalysisPDF } from '@/services/pdf';
-import { sendAnalysisEmail } from '@/services/email';
+import { sendEmail } from '@/services/email';
 import { AnalysisStatus } from '@/types/analysis';
 
 export async function POST(
@@ -151,20 +151,13 @@ export async function POST(
 
         // Step 6: Send email with analysis
         if (session.user.email) {
-          await sendAnalysisEmail(
-            session.user.email,
+          await sendEmail(
             {
-              id: analysis.id,
-              assessmentId,
-              userId,
-              status: 'completed',
-              content,
-              riskScores,
-              pdfUrl: publicUrl,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
+              to: session.user.email,
+              from: 'noreply@smartrisk.ai'
             },
-            pdfBuffer
+            'Your SmartRisk Analysis Results',
+            content
           );
         }
 
