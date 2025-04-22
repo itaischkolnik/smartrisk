@@ -4,65 +4,71 @@ const nextConfig = {
     serverActions: true,
   },
   images: {
-    domains: ['avatars.githubusercontent.com', 'lh3.googleusercontent.com', 'googleusercontent.com'],
+    domains: ['avatars.githubusercontent.com', 'lh3.googleusercontent.com'],
   },
   webpack: (config) => {
-    // Handle puppeteer in serverless environment
     if (!config.externals) {
       config.externals = [];
     }
     config.externals.push('puppeteer');
 
-    // Ignore source map files from chrome-aws-lambda
     config.module.rules.push({
       test: /\.map$/,
-      use: 'ignore-loader'
+      exclude: /node_modules/,
+      use: ['ignore-loader'],
     });
-    
+
     return config;
   },
-  // Add output configuration for serverless
   output: 'standalone',
-  // Configure domain handling
-  async rewrites() {
-    return {
-      beforeFiles: [
-        // Handle www to non-www redirect
-        {
-          source: '/:path*',
-          has: [
-            {
-              type: 'host',
-              value: 'www.smartrisk.co.il',
-            },
-          ],
-          destination: 'https://smartrisk.co.il/:path*',
-        },
-      ],
-    };
-  },
-  // Add headers for security and CORS
   async headers() {
     return [
       {
-        source: '/api/:path*',
+        source: '/:path*',
         headers: [
           {
-            key: 'Access-Control-Allow-Origin',
-            value: '*',
+            key: 'X-Frame-Options',
+            value: 'DENY',
           },
           {
-            key: 'Access-Control-Allow-Methods',
-            value: 'GET, POST, PUT, DELETE, OPTIONS',
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
           },
           {
-            key: 'Access-Control-Allow-Headers',
-            value: 'Content-Type, Authorization',
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
           },
         ],
       },
     ];
-  }
-}
+  },
+  async rewrites() {
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    if (isProduction) {
+      return {
+        beforeFiles: [
+          {
+            source: '/:path*',
+            has: [
+              {
+                type: 'host',
+                value: 'www.smartrisk.co.il',
+              },
+            ],
+            destination: 'https://smartrisk.co.il/:path*',
+          },
+        ],
+      };
+    }
+    
+    // Return empty rewrites in development
+    return [];
+  },
+};
 
-module.exports = nextConfig 
+module.exports = nextConfig;
