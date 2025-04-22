@@ -195,6 +195,8 @@ export async function deleteAssessment(id: string) {
 // Submit assessment for analysis
 export async function submitAssessmentForAnalysis(assessment: Assessment) {
   try {
+    console.log('Starting assessment analysis submission...', { assessmentId: assessment.id });
+
     // First update status in database
     const { error: updateError } = await supabase
       .from('assessments')
@@ -204,30 +206,52 @@ export async function submitAssessmentForAnalysis(assessment: Assessment) {
       })
       .eq('id', assessment.id);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error('Error updating assessment status:', updateError);
+      throw updateError;
+    }
 
     // Call the analyze API endpoint
     const response = await fetch(`/api/assessment/${assessment.id}/analyze`, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to analyze assessment');
+      console.error('Analysis API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        data
+      });
+      throw new Error(data.error || data.details || 'Failed to analyze assessment');
     }
 
-    return { success: true };
+    if (!data.success) {
+      console.error('Analysis not successful:', data);
+      throw new Error(data.error || 'Analysis was not successful');
+    }
+
+    return { success: true, data };
   } catch (error) {
     console.error('Error submitting assessment for analysis:', error);
     
     // Update status to reflect error
-    await supabase
-      .from('assessments')
-      .update({
-        status: 'draft',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', assessment.id);
+    try {
+      await supabase
+        .from('assessments')
+        .update({
+          status: 'failed',
+          error_message: error instanceof Error ? error.message : 'Unknown error',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', assessment.id);
+    } catch (updateError) {
+      console.error('Error updating assessment status after failure:', updateError);
+    }
       
     return { 
       success: false, 

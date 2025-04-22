@@ -6,6 +6,7 @@ import { auth } from '@/lib/supabase/auth';
 
 // Configure runtime
 export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const startTime = Date.now();
@@ -39,7 +40,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         .eq('id', id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error fetching assessment:', error);
+        throw error;
+      }
       if (!data) {
         console.log('Assessment not found');
         return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
@@ -54,23 +58,34 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       });
     } catch (error) {
       console.error('Error fetching assessment:', error);
-      return NextResponse.json({ error: 'Failed to fetch assessment data' }, { status: 500 });
+      return NextResponse.json({ 
+        error: 'Failed to fetch assessment data',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 500 });
     }
 
     console.log('Updating assessment status to processing...');
     // Update assessment status to processing
     try {
-      await supabase
+      const { error: updateError } = await supabase
         .from('assessments')
         .update({ 
           status: 'processing',
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
+
+      if (updateError) {
+        console.error('Error updating assessment status:', updateError);
+        throw updateError;
+      }
       console.log('Status updated to processing');
     } catch (error) {
       console.error('Error updating assessment status:', error);
-      return NextResponse.json({ error: 'Failed to update assessment status' }, { status: 500 });
+      return NextResponse.json({ 
+        error: 'Failed to update assessment status',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 500 });
     }
 
     console.log('Starting analysis generation...');
@@ -146,17 +161,23 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     } catch (error) {
       console.error('Error generating analysis:', error);
-      await supabase
-        .from('assessments')
-        .update({ 
-          status: 'failed',
-          error_message: error instanceof Error ? error.message : 'Unknown error',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
+      try {
+        await supabase
+          .from('assessments')
+          .update({ 
+            status: 'failed',
+            error_message: error instanceof Error ? error.message : 'Unknown error',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+      } catch (updateError) {
+        console.error('Error updating assessment status after failure:', updateError);
+      }
       
-      const errorMessage = error instanceof Error ? error.message : 'Failed to generate analysis';
-      return NextResponse.json({ error: errorMessage }, { status: 500 });
+      return NextResponse.json({ 
+        error: error instanceof Error ? error.message : 'Failed to generate analysis',
+        details: error instanceof Error ? error.stack : undefined
+      }, { status: 500 });
     }
 
   } catch (error) {
@@ -182,7 +203,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     return NextResponse.json({ 
       error: 'An unexpected error occurred',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 });
   }
 } 
