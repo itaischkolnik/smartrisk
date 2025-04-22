@@ -46,27 +46,25 @@ const nextConfig = {
       },
     ];
   },
-  async rewrites() {
+  async redirects() {
     const isProduction = process.env.NODE_ENV === 'production';
     
     if (isProduction) {
-      return {
-        beforeFiles: [
-          {
-            source: '/:path*',
-            has: [
-              {
-                type: 'host',
-                value: 'www.smartrisk.co.il',
-              },
-            ],
-            destination: 'https://smartrisk.co.il/:path*',
-          },
-        ],
-      };
+      return [
+        {
+          source: '/:path*',
+          has: [
+            {
+              type: 'host',
+              value: 'www.smartrisk.co.il',
+            },
+          ],
+          destination: 'https://smartrisk.co.il/:path*',
+          permanent: true,
+        },
+      ];
     }
     
-    // Return empty rewrites in development
     return [];
   },
 };
