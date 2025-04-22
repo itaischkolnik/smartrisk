@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { generateBusinessAnalysis } from '@/services/openai';
-import { generateAnalysisPDF } from '@/services/pdf';
 import { sendEmail } from '@/services/email';
-import { AnalysisStatus } from '@/types/analysis';
 import { auth } from '@/lib/supabase/auth';
 
 // Configure runtime
@@ -31,22 +29,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     // Create a Supabase client
     const supabase = createServerSupabaseClient();
 
-    console.log('Updating assessment status to processing...');
-    // Update assessment status to processing
-    try {
-      await supabase
-        .from('assessments')
-        .update({ 
-          status: 'processing',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-      console.log('Status updated to processing');
-    } catch (error) {
-      console.error('Error updating assessment status:', error);
-      return Response.json({ error: 'Failed to update assessment status' }, { status: 500 });
-    }
-
     console.log('Fetching assessment data...');
     // Fetch assessment data
     let assessment;
@@ -66,14 +48,23 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       console.log('Assessment data fetched successfully');
     } catch (error) {
       console.error('Error fetching assessment:', error);
+      return Response.json({ error: 'Failed to fetch assessment data' }, { status: 500 });
+    }
+
+    console.log('Updating assessment status to processing...');
+    // Update assessment status to processing
+    try {
       await supabase
         .from('assessments')
         .update({ 
-          status: 'failed',
+          status: 'processing',
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
-      return Response.json({ error: 'Failed to fetch assessment data' }, { status: 500 });
+      console.log('Status updated to processing');
+    } catch (error) {
+      console.error('Error updating assessment status:', error);
+      return Response.json({ error: 'Failed to update assessment status' }, { status: 500 });
     }
 
     console.log('Starting analysis generation...');
@@ -81,12 +72,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     let analysisResult;
     try {
       analysisResult = await generateBusinessAnalysis({
-        businessDetails: assessment.businessDetails,
-        swotAnalysis: assessment.swotAnalysis,
+        businessDetails: assessment.business_details,
+        swotAnalysis: assessment.swot_analysis,
         questionnaire: assessment.questionnaire,
         files: assessment.files || []
       });
       console.log('Analysis generated successfully');
+
+      if (!analysisResult?.content) {
+        throw new Error('No analysis content received');
+      }
 
       console.log('Updating assessment with analysis results...');
       // Update assessment with analysis
@@ -94,9 +89,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         .from('assessments')
         .update({
           analysis: analysisResult.content,
-          riskScore: analysisResult.riskScore,
+          risk_score: analysisResult.riskScore,
           status: 'completed',
-          completedAt: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
@@ -108,7 +103,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         await sendEmail({
           to: session.user.email,
           subject: 'Your SmartRisk Analysis is Ready',
-          businessName: assessment.businessDetails?.name || 'Your Business',
+          businessName: assessment.business_details?.name || 'Your Business',
+          businessType: assessment.business_details?.type,
           analysis: analysisResult.content,
           riskScore: analysisResult.riskScore
         });
