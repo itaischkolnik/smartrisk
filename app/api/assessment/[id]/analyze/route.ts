@@ -10,21 +10,28 @@ import { auth } from '@/lib/supabase/auth';
 export const runtime = 'edge';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
+  const startTime = Date.now();
+  console.log('Starting analysis process...');
+  
   try {
     const { id } = params;
     if (!id) {
       return Response.json({ error: 'Assessment ID is required' }, { status: 400 });
     }
 
+    console.log('Getting user session...');
     // Get user session
     const session = await auth();
     if (!session?.user?.email) {
+      console.log('User not authenticated');
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    console.log('User authenticated:', session.user.email);
 
     // Create a Supabase client
     const supabase = createServerSupabaseClient();
 
+    console.log('Updating assessment status to processing...');
     // Update assessment status to processing
     try {
       await supabase
@@ -34,11 +41,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
+      console.log('Status updated to processing');
     } catch (error) {
       console.error('Error updating assessment status:', error);
       return Response.json({ error: 'Failed to update assessment status' }, { status: 500 });
     }
 
+    console.log('Fetching assessment data...');
     // Fetch assessment data
     let assessment;
     try {
@@ -50,9 +59,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
       if (error) throw error;
       if (!data) {
+        console.log('Assessment not found');
         return Response.json({ error: 'Assessment not found' }, { status: 404 });
       }
       assessment = data;
+      console.log('Assessment data fetched successfully');
     } catch (error) {
       console.error('Error fetching assessment:', error);
       await supabase
@@ -65,6 +76,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return Response.json({ error: 'Failed to fetch assessment data' }, { status: 500 });
     }
 
+    console.log('Starting analysis generation...');
     // Generate analysis
     let analysisResult;
     try {
@@ -74,7 +86,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         questionnaire: assessment.questionnaire,
         files: assessment.files || []
       });
+      console.log('Analysis generated successfully');
 
+      console.log('Updating assessment with analysis results...');
       // Update assessment with analysis
       await supabase
         .from('assessments')
@@ -86,7 +100,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
+      console.log('Assessment updated with analysis results');
 
+      console.log('Sending email notification...');
       // Send email with results
       try {
         await sendEmail({
@@ -96,11 +112,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           analysis: analysisResult.content,
           riskScore: analysisResult.riskScore
         });
+        console.log('Email sent successfully');
       } catch (emailError) {
         console.error('Error sending email:', emailError);
         // Don't fail the request if email fails, just log it
       }
 
+      const totalDuration = Date.now() - startTime;
+      console.log(`Analysis process completed in ${totalDuration}ms`);
+      
       return Response.json({ 
         success: true, 
         message: 'Analysis completed successfully',
@@ -137,6 +157,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     } catch (updateError) {
       console.error('Failed to update assessment status to failed:', updateError);
     }
+
+    const totalDuration = Date.now() - startTime;
+    console.log(`Analysis process failed after ${totalDuration}ms`);
 
     return Response.json({ 
       error: 'An unexpected error occurred',

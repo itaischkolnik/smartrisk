@@ -22,20 +22,31 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 }
 
 export async function generateBusinessAnalysis(data: BusinessData): Promise<AnalysisResult> {
+  console.log('Starting business analysis generation...');
+  
   // Check if OpenAI API key is set
   if (!process.env.OPENAI_API_KEY) {
-    console.warn('Using mock implementation for development');
+    console.warn('OpenAI API key not found - Using mock implementation for development');
     return {
       content: "This is a mock analysis for development purposes.",
       riskScore: 50
     };
   }
 
+  console.log('Initializing OpenAI client...');
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
   });
 
   try {
+    console.log('Preparing analysis prompt...');
+    console.log('Input data sizes:', {
+      businessDetailsLength: JSON.stringify(data.businessDetails).length,
+      swotAnalysisLength: JSON.stringify(data.swotAnalysis).length,
+      questionnaireLength: JSON.stringify(data.questionnaire).length,
+      filesCount: data.files.length
+    });
+
     const prompt = `Analyze this business:
     Business Details: ${JSON.stringify(data.businessDetails)}
     SWOT Analysis: ${JSON.stringify(data.swotAnalysis)}
@@ -53,6 +64,9 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
     Important: Keep the response concise and focused on key insights.
     Make sure to include a clear risk score in the format 'Risk Score: X' where X is a number between 0 and 100.`;
 
+    console.log('Calling OpenAI API...');
+    const startTime = Date.now();
+    
     // Set a 3-minute timeout for the OpenAI API call
     const completion = await withTimeout(
       openai.chat.completions.create({
@@ -73,11 +87,16 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
       180000 // 3 minutes overall timeout
     );
 
+    const apiDuration = Date.now() - startTime;
+    console.log(`OpenAI API call completed in ${apiDuration}ms`);
+
     const content = completion.choices[0]?.message?.content;
     if (!content) {
+      console.error('No content in OpenAI response');
       throw new Error('No response content received from OpenAI');
     }
 
+    console.log('Extracting risk score...');
     // Extract risk score from the content
     const riskScoreMatch = content.match(/risk score:?\s*(\d+)/i);
     
@@ -96,6 +115,7 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
       };
     }
 
+    console.log('Analysis generation completed successfully');
     return {
       content,
       riskScore
