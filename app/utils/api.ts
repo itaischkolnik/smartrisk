@@ -197,7 +197,31 @@ export async function submitAssessmentForAnalysis(assessment: Assessment) {
   try {
     console.log('Starting assessment analysis submission...', { assessmentId: assessment.id });
 
-    // First update status in database
+    // First validate that we have all required sections
+    const { data: sections, error: sectionsError } = await supabase
+      .from('assessment_data')
+      .select('*')
+      .eq('assessment_id', assessment.id);
+
+    if (sectionsError) {
+      console.error('Error fetching assessment sections:', sectionsError);
+      throw new Error('Failed to validate assessment sections');
+    }
+
+    const sectionMap = sections?.reduce((acc, section) => {
+      acc[section.section] = section.data;
+      return acc;
+    }, {} as Record<string, any>) || {};
+
+    // Validate required sections
+    const requiredSections = ['business_details', 'swot_analysis', 'questionnaire'];
+    const missingSections = requiredSections.filter(section => !sectionMap[section]);
+    
+    if (missingSections.length > 0) {
+      throw new Error(`Missing required sections: ${missingSections.join(', ')}`);
+    }
+
+    // Update status in database
     const { error: updateError } = await supabase
       .from('assessments')
       .update({
@@ -241,11 +265,12 @@ export async function submitAssessmentForAnalysis(assessment: Assessment) {
     
     // Update status to reflect error
     try {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       await supabase
         .from('assessments')
         .update({
           status: 'failed',
-          error_message: error instanceof Error ? error.message : 'Unknown error',
+          error_message: errorMessage,
           updated_at: new Date().toISOString(),
         })
         .eq('id', assessment.id);
