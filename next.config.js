@@ -23,6 +23,46 @@ const nextConfig = {
   },
   // Add output configuration for serverless
   output: 'standalone',
+  // Configure domain handling
+  async rewrites() {
+    return {
+      beforeFiles: [
+        // Handle www to non-www redirect
+        {
+          source: '/:path*',
+          has: [
+            {
+              type: 'host',
+              value: 'www.smartrisk.co.il',
+            },
+          ],
+          destination: 'https://smartrisk.co.il/:path*',
+        },
+      ],
+    };
+  },
+  // Add headers for security and CORS
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, PUT, DELETE, OPTIONS',
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type, Authorization',
+          },
+        ],
+      },
+    ];
+  }
 }
 
 module.exports = nextConfig 
