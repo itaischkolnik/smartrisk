@@ -24,7 +24,11 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 export async function generateBusinessAnalysis(data: BusinessData): Promise<AnalysisResult> {
   // Check if OpenAI API key is set
   if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OpenAI API key is not configured. Please set the OPENAI_API_KEY environment variable.');
+    console.warn('Using mock implementation for development');
+    return {
+      content: "This is a mock analysis for development purposes.",
+      riskScore: 50
+    };
   }
 
   const openai = new OpenAI({
@@ -49,10 +53,10 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
     Important: Keep the response concise and focused on key insights.
     Make sure to include a clear risk score in the format 'Risk Score: X' where X is a number between 0 and 100.`;
 
-    // Set a 60-second timeout for the OpenAI API call
-    const response = await withTimeout(
+    // Set a 3-minute timeout for the OpenAI API call
+    const completion = await withTimeout(
       openai.chat.completions.create({
-        model: "gpt-4-turbo-preview",
+        model: "gpt-4",  // Using more stable model
         messages: [
           {
             role: "system",
@@ -63,13 +67,13 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
             content: prompt
           }
         ],
-        temperature: 0.7,
-        max_tokens: 1500 // Reduced token limit for faster response
+        temperature: 0.5,  // Lower temperature for more consistent results
+        max_tokens: 2000  // Increased token limit for more detailed analysis
       }),
-      60000 // 60 seconds overall timeout
+      180000 // 3 minutes overall timeout
     );
 
-    const content = response.choices?.[0]?.message?.content;
+    const content = completion.choices[0]?.message?.content;
     if (!content) {
       throw new Error('No response content received from OpenAI');
     }
@@ -102,14 +106,14 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
     
     if (error instanceof Error) {
       if (error.message.includes('timed out')) {
-        throw new Error('The analysis is taking longer than expected. Please try again. If this persists, try breaking down your input into smaller sections.');
+        throw new Error('הניתוח לוקח יותר זמן מהצפוי. אנא נסה שוב. אם הבעיה נמשכת, נסה לפצל את המידע לחלקים קטנים יותר.');
       }
       
       // Throw the original error with more context
-      throw new Error(`Failed to generate analysis: ${error.message}`);
+      throw new Error(`כשל בייצור הניתוח: ${error.message}`);
     }
     
     // For unknown errors
-    throw new Error('An unexpected error occurred while generating the analysis');
+    throw new Error('אירעה שגיאה בלתי צפויה במהלך ייצור הניתוח');
   }
 } 
