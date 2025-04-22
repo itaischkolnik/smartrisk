@@ -14,7 +14,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   try {
     const { id } = params;
     if (!id) {
-      return Response.json({ error: 'Assessment ID is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Assessment ID is required' }, { status: 400 });
     }
 
     console.log('Getting user session...');
@@ -22,7 +22,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const session = await auth();
     if (!session?.user?.email) {
       console.log('User not authenticated');
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.log('User authenticated:', session.user.email);
 
@@ -42,13 +42,19 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       if (error) throw error;
       if (!data) {
         console.log('Assessment not found');
-        return Response.json({ error: 'Assessment not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
       }
       assessment = data;
-      console.log('Assessment data fetched successfully');
+      console.log('Assessment data fetched:', {
+        id: assessment.id,
+        status: assessment.status,
+        hasBusinessDetails: !!assessment.business_details,
+        hasSwotAnalysis: !!assessment.swot_analysis,
+        hasQuestionnaire: !!assessment.questionnaire
+      });
     } catch (error) {
       console.error('Error fetching assessment:', error);
-      return Response.json({ error: 'Failed to fetch assessment data' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch assessment data' }, { status: 500 });
     }
 
     console.log('Updating assessment status to processing...');
@@ -64,13 +70,24 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       console.log('Status updated to processing');
     } catch (error) {
       console.error('Error updating assessment status:', error);
-      return Response.json({ error: 'Failed to update assessment status' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to update assessment status' }, { status: 500 });
     }
 
     console.log('Starting analysis generation...');
     // Generate analysis
     let analysisResult;
     try {
+      // Validate required data
+      if (!assessment.business_details) {
+        throw new Error('Business details are required for analysis');
+      }
+      if (!assessment.swot_analysis) {
+        throw new Error('SWOT analysis is required for analysis');
+      }
+      if (!assessment.questionnaire) {
+        throw new Error('Questionnaire responses are required for analysis');
+      }
+
       analysisResult = await generateBusinessAnalysis({
         businessDetails: assessment.business_details,
         swotAnalysis: assessment.swot_analysis,
@@ -85,7 +102,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
       console.log('Updating assessment with analysis results...');
       // Update assessment with analysis
-      await supabase
+      const { error: updateError } = await supabase
         .from('assessments')
         .update({
           analysis: analysisResult.content,
@@ -95,6 +112,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
+
+      if (updateError) {
+        throw new Error(`Failed to update assessment with analysis: ${updateError.message}`);
+      }
       console.log('Assessment updated with analysis results');
 
       console.log('Sending email notification...');
@@ -117,7 +138,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       const totalDuration = Date.now() - startTime;
       console.log(`Analysis process completed in ${totalDuration}ms`);
       
-      return Response.json({ 
+      return NextResponse.json({ 
         success: true, 
         message: 'Analysis completed successfully',
         riskScore: analysisResult.riskScore
@@ -129,12 +150,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         .from('assessments')
         .update({ 
           status: 'failed',
+          error_message: error instanceof Error ? error.message : 'Unknown error',
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
       
       const errorMessage = error instanceof Error ? error.message : 'Failed to generate analysis';
-      return Response.json({ error: errorMessage }, { status: 500 });
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 
   } catch (error) {
@@ -147,6 +169,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         .from('assessments')
         .update({ 
           status: 'failed',
+          error_message: error instanceof Error ? error.message : 'Unknown error',
           updated_at: new Date().toISOString()
         })
         .eq('id', params.id);
@@ -157,7 +180,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const totalDuration = Date.now() - startTime;
     console.log(`Analysis process failed after ${totalDuration}ms`);
 
-    return Response.json({ 
+    return NextResponse.json({ 
       error: 'An unexpected error occurred',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
