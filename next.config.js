@@ -46,27 +46,6 @@ const nextConfig = {
       },
     ];
   },
-  async redirects() {
-    const isProduction = process.env.NODE_ENV === 'production';
-    
-    if (isProduction) {
-      return [
-        {
-          source: '/:path*',
-          has: [
-            {
-              type: 'host',
-              value: 'www.smartrisk.co.il',
-            },
-          ],
-          destination: 'https://smartrisk.co.il/:path*',
-          permanent: true,
-        },
-      ];
-    }
-    
-    return [];
-  },
 };
 
 module.exports = nextConfig;
