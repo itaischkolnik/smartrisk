@@ -102,7 +102,7 @@ export async function saveAssessment(assessment: Partial<Assessment>, user: User
     };
 
     try {
-      // If we have an ID, update existing assessment
+      // If we have an ID, try to update existing assessment
       if (assessment.id) {
         const { data: existingAssessment, error: checkError } = await client
           .from('assessments')
@@ -111,22 +111,13 @@ export async function saveAssessment(assessment: Partial<Assessment>, user: User
           .eq('user_id', user.id)
           .single();
 
-        if (checkError) {
-          // Create new if doesn't exist
-          const { data, error } = await client
-            .from('assessments')
-            .insert({
-              ...validAssessment,
-              created_at: now,
-            })
-            .select()
-            .single();
-
-          if (error) {
-            console.error('Insert error:', error);
-            throw error;
-          }
-          return { assessment: data, error: null };
+        // If there's an error checking or assessment doesn't exist
+        if (checkError || !existingAssessment) {
+          console.error('Error checking existing assessment:', checkError);
+          return { 
+            assessment: null, 
+            error: new Error('Assessment not found or access denied') 
+          };
         }
 
         // Update existing assessment
