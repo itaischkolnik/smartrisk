@@ -214,7 +214,7 @@ export async function submitAssessmentForAnalysis(assessment: Assessment) {
     }, {} as Record<string, any>) || {};
 
     // Validate required sections
-    const requiredSections = ['business_details', 'swot_analysis', 'questionnaire'];
+    const requiredSections = ['business_details', 'swot_analysis', 'personal_questionnaire'];
     const missingSections = requiredSections.filter(section => !sectionMap[section]);
     
     if (missingSections.length > 0) {

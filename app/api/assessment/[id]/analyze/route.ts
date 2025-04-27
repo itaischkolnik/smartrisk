@@ -63,7 +63,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       const analysisResult = await generateBusinessAnalysis({
         businessDetails: assessment.business_details,
         swotAnalysis: assessment.swot_analysis,
-        questionnaire: assessment.questionnaire,
+        personalQuestionnaire: assessment.personal_questionnaire,
         files: assessment.files || []
       });
 

@@ -3,7 +3,7 @@ import OpenAI from 'openai';
 interface BusinessData {
   businessDetails: any;
   swotAnalysis: any;
-  questionnaire: any;
+  personalQuestionnaire: any;
   files: any[];
 }
 
@@ -39,7 +39,7 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
     console.log('Input data:', {
       businessDetails: data.businessDetails,
       swotAnalysis: data.swotAnalysis,
-      questionnaire: data.questionnaire,
+      personalQuestionnaire: data.personalQuestionnaire,
       filesCount: data.files.length
     });
 
@@ -51,8 +51,8 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
     SWOT Analysis:
     ${JSON.stringify(data.swotAnalysis, null, 2)}
     
-    Questionnaire Responses:
-    ${JSON.stringify(data.questionnaire, null, 2)}
+    Personal Questionnaire:
+    ${JSON.stringify(data.personalQuestionnaire, null, 2)}
     
     Additional Files: ${data.files.length} files attached
     
