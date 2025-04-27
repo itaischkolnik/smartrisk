@@ -87,30 +87,47 @@ export async function POST(request: Request) {
     try {
       // Format assessment data for OpenAI
       const prompt = `
-      Please analyze this business risk assessment data and provide a comprehensive analysis:
+      אנא נתח את נתוני הערכת הסיכון העסקית הבאה וספק ניתוח מקיף:
       
-      Business Details:
+      פרטי העסק:
       ${JSON.stringify(assessment.business_details || {}, null, 2)}
       
-      Personal Information:
+      מידע אישי:
       ${JSON.stringify(assessment.personal_details || {}, null, 2)}
       
-      Questionnaire:
+      שאלון:
       ${JSON.stringify(assessment.questionnaire || {}, null, 2)}
       
-      Financial Data:
+      נתונים פיננסיים:
       ${JSON.stringify(assessment.financial_data || {}, null, 2)}
       
-      SWOT Analysis:
+      ניתוח SWOT:
       ${JSON.stringify(assessment.swot_analysis || {}, null, 2)}
       
-      Please provide:
-      1. Executive Summary (2-3 paragraphs)
-      2. Detailed Risk Analysis (by business area)
-      3. Financial Viability Assessment
-      4. Recommendations
-      5. Risk Score (0-100, where 0 is extremely risky and 100 is very safe)
-      `;
+      אנא ספק:
+      1. תקציר מנהלים (3-4 פסקאות)
+      2. ניתוח מפורט של גורמי סיכון (לפי תחומי פעילות)
+         - סיכונים פיננסיים
+         - סיכונים תפעוליים
+         - סיכוני שוק ותחרות
+         - סיכוני הון אנושי
+      3. הערכת איתנות פיננסית
+         - ניתוח תזרים מזומנים
+         - יחסים פיננסיים מרכזיים
+         - מגמות צמיחה
+      4. הזדמנויות לצמיחה
+         - הזדמנויות שוק
+         - יתרונות תחרותיים
+         - פוטנציאל התרחבות
+      5. המלצות מפורטות
+         - המלצות לטווח קצר (0-6 חודשים)
+         - המלצות לטווח בינוני (6-18 חודשים)
+         - המלצות אסטרטגיות (18+ חודשים)
+      6. ציון סיכון (0-100, כאשר 0 מציין סיכון גבוה מאוד ו-100 מציין סיכון נמוך מאוד)
+         - פירוט הגורמים המשפיעים על הציון
+         - השוואה לממוצע בענף
+      
+      חשוב: יש לספק ניתוח מעמיק ומפורט בכל סעיף, תוך התייחסות לנתונים הספציפיים של העסק.`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4-turbo-preview",
