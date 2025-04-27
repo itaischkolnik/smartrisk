@@ -32,19 +32,24 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     console.log('Creating Supabase client...');
     const supabase = createServerSupabaseClient();
 
-    // Update status to draft (in case of failure)
-    console.log('Updating assessment status to draft...');
-    const { error: updateError } = await supabase
-      .from('assessments')
-      .update({ 
-        status: 'draft',
+    // Create an analysis record
+    console.log('Creating analysis record...');
+    const { data: analysis, error: createError } = await supabase
+      .from('analyses')
+      .insert({
+        assessment_id: id,
+        user_id: session.user.id,
+        status: 'processing',
+        analysis_content: {},
+        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .eq('id', id);
+      .select()
+      .single();
 
-    if (updateError) {
-      console.error('Error updating status:', updateError);
-      return NextResponse.json({ error: 'Failed to update assessment status' }, { status: 500 });
+    if (createError) {
+      console.error('Error creating analysis record:', createError);
+      return NextResponse.json({ error: 'Failed to create analysis record' }, { status: 500 });
     }
 
     // Fetch assessment data from assessment_data table
@@ -56,7 +61,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     if (sectionsError) {
       console.error('Error fetching assessment sections:', sectionsError);
-      await updateAssessmentStatus(supabase, id, 'draft', 'Failed to fetch assessment data');
+      await updateAnalysisStatus(supabase, analysis.id, 'failed', 'Failed to fetch assessment data');
       return NextResponse.json({ error: 'Failed to fetch assessment data' }, { status: 500 });
     }
 
@@ -85,23 +90,36 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       const analysisResult = await generateBusinessAnalysis(analysisData);
       console.log('Analysis generated successfully');
 
-      // Update assessment with analysis
+      // Update analysis record with results
       console.log('Saving analysis results...');
       const { error: saveError } = await supabase
-        .from('assessments')
+        .from('analyses')
         .update({
-          analysis: analysisResult.content,
-          risk_score: analysisResult.riskScore,
-          status: 'analyzed',
-          completed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          error_message: null // Clear any previous error messages
+          analysis_content: analysisResult.content,
+          overall_risk_score: analysisResult.riskScore / 10, // Convert 0-100 to 0-10
+          status: 'completed',
+          updated_at: new Date().toISOString()
         })
-        .eq('id', id);
+        .eq('id', analysis.id);
 
       if (saveError) {
         console.error('Error saving analysis:', saveError);
         throw new Error(`Failed to save analysis: ${saveError.message}`);
+      }
+
+      // Update assessment status
+      console.log('Updating assessment status...');
+      const { error: updateError } = await supabase
+        .from('assessments')
+        .update({
+          status: 'analyzed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (updateError) {
+        console.error('Error updating assessment status:', updateError);
+        throw new Error(`Failed to update assessment status: ${updateError.message}`);
       }
 
       // Send email notification
@@ -109,9 +127,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       try {
         await sendEmail({
           to: session.user.email,
-          subject: 'Your SmartRisk Analysis is Ready',
-          businessName: sectionData.business_details?.business_name || 'Your Business',
-          businessType: sectionData.business_details?.business_type || 'Business',
+          subject: 'ניתוח SmartRisk שלך מוכן',
+          businessName: sectionData.business_details?.business_name || 'העסק שלך',
+          businessType: sectionData.business_details?.business_type || 'עסק',
           riskScore: analysisResult.riskScore,
           analysis: analysisResult.content
         });
@@ -132,7 +150,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     } catch (error) {
       console.error('Error in analysis process:', error);
-      await updateAssessmentStatus(supabase, id, 'draft', error instanceof Error ? error.message : 'Analysis generation failed');
+      await updateAnalysisStatus(supabase, analysis.id, 'failed', error instanceof Error ? error.message : 'Analysis generation failed');
       return NextResponse.json({ 
         error: 'Failed to generate analysis',
         details: error instanceof Error ? error.message : 'Unknown error'
@@ -148,9 +166,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 }
 
-async function updateAssessmentStatus(supabase: any, id: string, status: 'draft' | 'completed' | 'analyzed', errorMessage?: string) {
+async function updateAnalysisStatus(supabase: any, id: string, status: 'pending' | 'processing' | 'completed' | 'failed', errorMessage?: string) {
   try {
-    console.log(`Updating assessment ${id} status to ${status}${errorMessage ? ': ' + errorMessage : ''}`);
+    console.log(`Updating analysis ${id} status to ${status}${errorMessage ? ': ' + errorMessage : ''}`);
     const update: any = {
       status,
       updated_at: new Date().toISOString()
@@ -160,8 +178,8 @@ async function updateAssessmentStatus(supabase: any, id: string, status: 'draft'
     } else {
       update.error_message = null; // Clear error message when status is updated without an error
     }
-    await supabase.from('assessments').update(update).eq('id', id);
+    await supabase.from('analyses').update(update).eq('id', id);
   } catch (error) {
-    console.error('Error updating assessment status:', error);
+    console.error('Error updating analysis status:', error);
   }
 } 

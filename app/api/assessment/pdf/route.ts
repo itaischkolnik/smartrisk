@@ -60,7 +60,7 @@ export async function POST(request: Request) {
 
     const { success, error: emailError } = await sendEmail({
       to: session.user.email,
-      subject: `SmartRisk Analysis - ${assessment.business_details?.business_name || 'Your Business'}`,
+      subject: `ניתוח SmartRisk - ${assessment.business_details?.business_name || 'העסק שלך'}`,
       businessName: assessment.business_details?.business_name,
       businessType: assessment.business_details?.business_type,
       riskScore: assessment.risk_score,

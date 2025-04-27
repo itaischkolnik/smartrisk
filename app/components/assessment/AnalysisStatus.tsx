@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { FiAlertCircle, FiCheckCircle, FiClock, FiRefreshCw } from 'react-icons/fi';
+import { FiAlertCircle, FiCheckCircle, FiClock, FiRefreshCw, FiHome } from 'react-icons/fi';
+import Link from 'next/link';
 
 interface AnalysisStatusProps {
   assessmentId: string;
@@ -98,7 +99,7 @@ export default function AnalysisStatus({ assessmentId }: AnalysisStatusProps) {
       case 'completed':
         return {
           icon: <FiCheckCircle className="h-5 w-5 text-green-500 ml-2" />,
-          text: 'הניתוח הושלם!',
+          text: 'הניתוח הושלם בהצלחה! ניתן לצפות בתוצאות בדוח שנשלח למייל.',
           bgColor: 'bg-green-50',
           borderColor: 'border-green-200',
           textColor: 'text-green-700'
@@ -126,9 +127,16 @@ export default function AnalysisStatus({ assessmentId }: AnalysisStatusProps) {
 
   return (
     <div className={`${statusDisplay.bgColor} border ${statusDisplay.borderColor} ${statusDisplay.textColor} px-4 py-3 rounded-lg`}>
-      <div className="flex items-center mb-2">
-        {statusDisplay.icon}
-        <span className="font-medium">{statusDisplay.text}</span>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center">
+          {statusDisplay.icon}
+          <span className="font-medium">{statusDisplay.text}</span>
+        </div>
+        {status.status === 'completed' && (
+          <Link href="/dashboard" className="hover:opacity-80 transition-opacity">
+            <FiHome className="h-5 w-5 text-green-600" title="חזרה ללוח הבקרה" />
+          </Link>
+        )}
       </div>
       
       {status.status === 'processing' && (

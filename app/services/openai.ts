@@ -43,28 +43,28 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
       filesCount: data.files.length
     });
 
-    const prompt = `Analyze this business briefly:
+    const prompt = `נתח את העסק הזה בקצרה:
     
-    Business Details:
+    פרטי העסק:
     ${JSON.stringify(data.businessDetails, null, 2)}
     
-    SWOT Analysis:
+    ניתוח SWOT:
     ${JSON.stringify(data.swotAnalysis, null, 2)}
     
-    Personal Questionnaire:
+    שאלון אישי:
     ${JSON.stringify(data.personalQuestionnaire, null, 2)}
     
-    Additional Files: ${data.files.length} files attached
+    קבצים נוספים: ${data.files.length} קבצים מצורפים
     
-    Please provide a concise analysis with:
+    אנא ספק ניתוח תמציתי הכולל:
     
-    1. Key Risk Factors (2-3 bullet points)
-    2. Quick Recommendations (2-3 bullet points)
-    3. Risk Score
+    1. גורמי סיכון עיקריים (2-3 נקודות)
+    2. המלצות מהירות (2-3 נקודות)
+    3. ציון סיכון
     
-    Important: Be very concise and focused.
-    Include a risk score in the format 'Risk Score: X' where X is a number between 0 and 100.
-    Higher scores (closer to 100) indicate lower risk.`;
+    חשוב: היה תמציתי וממוקד.
+    כלול ציון סיכון בפורמט 'ציון סיכון: X' כאשר X הוא מספר בין 0 ל-100.
+    ציונים גבוהים יותר (קרובים ל-100) מציינים סיכון נמוך יותר.`;
 
     console.log('Calling OpenAI API...');
     const startTime = Date.now();
@@ -76,7 +76,7 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
         messages: [
           {
             role: "system",
-            content: "You are a business risk analysis expert. Provide brief, actionable insights."
+            content: "אתה מומחה לניתוח סיכונים עסקיים. ספק תובנות קצרות ופרקטיות בעברית."
           },
           {
             role: "user",
