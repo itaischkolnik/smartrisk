@@ -56,7 +56,7 @@ export async function sendEmail(config: EmailConfig): Promise<EmailResult> {
     `;
 
     const { data, error } = await resend.emails.send({
-      from: 'SmartRisk <no-reply@smartrisk.co.il>',
+      from: 'SmartRisk <onboarding@resend.dev>',
       to: config.to,
       subject: config.subject,
       html: html

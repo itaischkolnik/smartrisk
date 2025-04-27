@@ -43,7 +43,7 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
       filesCount: data.files.length
     });
 
-    const prompt = `Analyze this business:
+    const prompt = `Analyze this business briefly:
     
     Business Details:
     ${JSON.stringify(data.businessDetails, null, 2)}
@@ -56,32 +56,27 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
     
     Additional Files: ${data.files.length} files attached
     
-    Please provide a comprehensive analysis in the following format:
+    Please provide a concise analysis with:
     
-    1. Executive Summary (2-3 paragraphs)
-    2. Risk Assessment
-       - Market Risk
-       - Financial Risk
-       - Operational Risk
-    3. Key Findings
-    4. Recommendations
-    5. Risk Score
+    1. Key Risk Factors (2-3 bullet points)
+    2. Quick Recommendations (2-3 bullet points)
+    3. Risk Score
     
-    Important: Keep the response focused on key insights.
-    Make sure to include a clear risk score in the format 'Risk Score: X' where X is a number between 0 and 100.
+    Important: Be very concise and focused.
+    Include a risk score in the format 'Risk Score: X' where X is a number between 0 and 100.
     Higher scores (closer to 100) indicate lower risk.`;
 
     console.log('Calling OpenAI API...');
     const startTime = Date.now();
     
-    // Set a 3-minute timeout for the OpenAI API call
+    // Set a 2-minute timeout for the OpenAI API call
     const completion = await withTimeout(
       openai.chat.completions.create({
         model: "gpt-4",
         messages: [
           {
             role: "system",
-            content: "You are a business risk analysis expert. Provide detailed analysis and concrete recommendations."
+            content: "You are a business risk analysis expert. Provide brief, actionable insights."
           },
           {
             role: "user",
@@ -89,9 +84,9 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
           }
         ],
         temperature: 0.5,
-        max_tokens: 2000
+        max_tokens: 1000
       }),
-      180000 // 3 minutes timeout
+      120000 // 2 minutes timeout
     );
 
     const apiDuration = Date.now() - startTime;
