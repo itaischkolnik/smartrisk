@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 
     // Start the analysis process in the background
     // This will return immediately while the analysis continues
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/assessment/${assessmentId}/analyze`, {
+    fetch(`${request.headers.get('origin')}/api/assessment/${assessmentId}/analyze`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
