@@ -3,12 +3,6 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { generateBusinessAnalysis } from '@/services/openai';
 import { sendEmail } from '@/services/email';
 import { auth } from '@/lib/supabase/auth';
-import OpenAI from 'openai';
-
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 // Configure runtime
 export const runtime = 'edge';
@@ -38,12 +32,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     console.log('Creating Supabase client...');
     const supabase = createServerSupabaseClient();
 
-    // Update status to processing
-    console.log('Updating assessment status to analyzing...');
+    // Update status to draft (in case of failure)
+    console.log('Updating assessment status to draft...');
     const { error: updateError } = await supabase
       .from('assessments')
       .update({ 
-        status: 'analyzed',
+        status: 'draft',
         updated_at: new Date().toISOString()
       })
       .eq('id', id);
@@ -100,7 +94,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           risk_score: analysisResult.riskScore,
           status: 'analyzed',
           completed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          error_message: null // Clear any previous error messages
         })
         .eq('id', id);
 
@@ -162,6 +157,8 @@ async function updateAssessmentStatus(supabase: any, id: string, status: 'draft'
     };
     if (errorMessage) {
       update.error_message = errorMessage;
+    } else {
+      update.error_message = null; // Clear error message when status is updated without an error
     }
     await supabase.from('assessments').update(update).eq('id', id);
   } catch (error) {
