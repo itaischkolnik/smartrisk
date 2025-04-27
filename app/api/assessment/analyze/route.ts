@@ -6,19 +6,7 @@ import OpenAI from 'openai';
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 180000, // 3 minutes timeout
-  maxRetries: 3,
 });
-
-// Helper function to add timeout to promises
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  const timeout = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
-  });
-  return Promise.race([promise, timeout]);
-}
-
-export const maxDuration = 300; // Set Next.js route handler timeout to 5 minutes
 
 export async function POST(request: Request) {
   try {
@@ -59,132 +47,95 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate analysis using OpenAI with timeout
-    try {
-      const prompt = `
-      אנא נתח את נתוני הערכת הסיכון העסקית הבאה וספק ניתוח מקיף:
+    // Generate analysis using OpenAI
+    const prompt = `
+      Please analyze this business risk assessment data and provide a comprehensive analysis:
       
-      פרטי העסק:
+      Business Details:
       ${JSON.stringify(assessment.business_details || {}, null, 2)}
       
-      מידע אישי:
+      Personal Information:
       ${JSON.stringify(assessment.personal_details || {}, null, 2)}
       
-      שאלון:
+      Questionnaire:
       ${JSON.stringify(assessment.questionnaire || {}, null, 2)}
       
-      נתונים פיננסיים:
+      Financial Data:
       ${JSON.stringify(assessment.financial_data || {}, null, 2)}
       
-      ניתוח SWOT:
+      SWOT Analysis:
       ${JSON.stringify(assessment.swot_analysis || {}, null, 2)}
       
-      אנא ספק:
-      1. תקציר מנהלים (3-4 פסקאות)
-      2. ניתוח מפורט של גורמי סיכון (לפי תחומי פעילות)
-         - סיכונים פיננסיים
-         - סיכונים תפעוליים
-         - סיכוני שוק ותחרות
-         - סיכוני הון אנושי
-      3. הערכת איתנות פיננסית
-         - ניתוח תזרים מזומנים
-         - יחסים פיננסיים מרכזיים
-         - מגמות צמיחה
-      4. הזדמנויות לצמיחה
-         - הזדמנויות שוק
-         - יתרונות תחרותיים
-         - פוטנציאל התרחבות
-      5. המלצות מפורטות
-         - המלצות לטווח קצר (0-6 חודשים)
-         - המלצות לטווח בינוני (6-18 חודשים)
-         - המלצות אסטרטגיות (18+ חודשים)
-      6. ציון סיכון (0-100, כאשר 0 מציין סיכון גבוה מאוד ו-100 מציין סיכון נמוך מאוד)
-         - פירוט הגורמים המשפיעים על הציון
-         - השוואה לממוצע בענף
-      
-      חשוב: יש לספק ניתוח מעמיק ומפורט בכל סעיף, תוך התייחסות לנתונים הספציפיים של העסק.`;
+      Please provide:
+      1. Executive Summary (2-3 paragraphs)
+      2. Market Analysis and Competition
+      3. Detailed Risk Analysis (by business area)
+      4. Financial Viability Assessment
+      5. Operational Risks and Mitigation Strategies
+      6. Legal and Regulatory Compliance Analysis
+      7. Technology and Infrastructure Assessment
+      8. Human Resources and Management Evaluation
+      9. Growth Potential and Scalability Analysis
+      10. Strategic Recommendations
+      11. Risk Score (0-100, where 0 is extremely risky and 100 is very safe)
+    `;
 
-      const completion = await withTimeout(
-        openai.chat.completions.create({
-          model: "gpt-4-turbo-preview",
-          messages: [
-            {
-              role: "system",
-              content: "אתה מומחה לניתוח סיכונים עסקיים. ספק תובנות קצרות ופרקטיות בעברית נכונה וללא שגיאות דקדוק."
-            },
-            {
-              role: "user",
-              content: prompt
-            }
-          ],
-          temperature: 0.5,
-          max_tokens: 2500
-        }),
-        180000 // 3 minutes timeout
-      );
-
-      const analysis = completion.choices[0]?.message?.content || '';
-      
-      if (!analysis) {
-        throw new Error('No analysis content received from OpenAI');
-      }
-
-      // Extract risk score from analysis
-      let riskScore = 50; // Default score
-      const scoreMatch = analysis.match(/ציון סיכון:?\s*(\d+)/i);
-      if (scoreMatch && scoreMatch[1]) {
-        riskScore = parseInt(scoreMatch[1], 10);
-        if (isNaN(riskScore) || riskScore < 0 || riskScore > 100) {
-          console.warn('Invalid risk score received:', riskScore);
-          riskScore = 50; // Default if parsing fails
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4-turbo-preview",
+      messages: [
+        {
+          role: "system",
+          content: "אתה מומחה לניתוח סיכונים עסקיים. ספק תובנות קצרות ופרקטיות בעברית נכונה וללא שגיאות דקדוק."
+        },
+        {
+          role: "user",
+          content: prompt
         }
+      ],
+      temperature: 0.5,
+      max_tokens: 2500
+    });
+
+    const analysis = completion.choices[0]?.message?.content || '';
+    
+    // Extract risk score from analysis
+    let riskScore = 50; // Default score
+    const scoreMatch = analysis.match(/Risk Score:?\s*(\d+)/i);
+    if (scoreMatch && scoreMatch[1]) {
+      riskScore = parseInt(scoreMatch[1], 10);
+      if (isNaN(riskScore) || riskScore < 0 || riskScore > 100) {
+        riskScore = 50; // Default if parsing fails
       }
+    }
 
-      // Update assessment with analysis
-      const { error: updateError } = await supabase
-        .from('assessments')
-        .update({
-          analysis: analysis,
-          risk_score: riskScore,
-          status: 'completed',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', assessmentId);
+    // Update assessment with analysis
+    const { error: updateError } = await supabase
+      .from('assessments')
+      .update({
+        analysis: analysis,
+        risk_score: riskScore,
+        status: 'completed',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', assessmentId);
 
-      if (updateError) {
-        console.error('Error saving analysis:', updateError);
-        return NextResponse.json(
-          { error: 'Failed to save analysis' },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({
-        success: true,
-        analysis,
-        riskScore,
-      });
-    } catch (aiError) {
-      console.error('Error generating analysis with OpenAI:', aiError);
-      
-      // Update assessment status to error
-      await supabase
-        .from('assessments')
-        .update({
-          status: 'error',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', assessmentId);
-      
+    if (updateError) {
+      console.error('Error saving analysis:', updateError);
       return NextResponse.json(
-        { error: aiError instanceof Error ? aiError.message : 'Failed to generate analysis' },
+        { error: 'Failed to save analysis' },
         { status: 500 }
       );
     }
+
+    return NextResponse.json({
+      success: true,
+      analysis,
+      riskScore,
+    });
   } catch (error) {
     console.error('Error in analysis:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
