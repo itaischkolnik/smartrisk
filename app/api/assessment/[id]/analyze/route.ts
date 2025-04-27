@@ -3,6 +3,12 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { generateBusinessAnalysis } from '@/services/openai';
 import { sendEmail } from '@/services/email';
 import { auth } from '@/lib/supabase/auth';
+import OpenAI from 'openai';
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // Configure runtime
 export const runtime = 'edge';
@@ -44,35 +50,83 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: 'Failed to update assessment status' }, { status: 500 });
     }
 
-    console.log('Fetching assessment data...');
-    // Fetch assessment and its sections
-    const { data: assessment, error: assessmentError } = await supabase
-      .from('assessments')
-      .select('*')
-      .eq('id', id)
-      .single();
+    // Fetch assessment data from assessment_data table
+    const { data: sections, error: sectionsError } = await supabase
+      .from('assessment_data')
+      .select('section, data')
+      .eq('assessment_id', id);
 
-    if (assessmentError || !assessment) {
-      console.error('Error fetching assessment:', assessmentError);
+    if (sectionsError) {
+      console.error('Error fetching assessment sections:', sectionsError);
       await updateAssessmentStatus(supabase, id, 'failed', 'Failed to fetch assessment data');
-      return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Failed to fetch assessment data' }, { status: 500 });
     }
 
+    // Convert sections array to an object for easier access
+    const sectionData = sections?.reduce((acc, section) => {
+      acc[section.section] = section.data;
+      return acc;
+    }, {} as Record<string, any>) || {};
+
     try {
-      // Generate analysis using OpenAI
-      const analysisResult = await generateBusinessAnalysis({
-        businessDetails: assessment.business_details,
-        swotAnalysis: assessment.swot_analysis,
-        personalQuestionnaire: assessment.personal_questionnaire,
-        files: assessment.files || []
+      // Format assessment data for OpenAI
+      const prompt = `
+      Please analyze this business risk assessment data and provide a comprehensive analysis:
+      
+      Business Details:
+      ${JSON.stringify(sectionData.business_details || {}, null, 2)}
+      
+      Personal Information:
+      ${JSON.stringify(sectionData.personal_details || {}, null, 2)}
+      
+      Personal Questionnaire:
+      ${JSON.stringify(sectionData.personal_questionnaire || {}, null, 2)}
+      
+      Financial Data:
+      ${JSON.stringify(sectionData.financial_data || {}, null, 2)}
+      
+      SWOT Analysis:
+      ${JSON.stringify(sectionData.swot_analysis || {}, null, 2)}
+      
+      Please provide:
+      1. Executive Summary (2-3 paragraphs)
+      2. Detailed Risk Analysis (by business area)
+      3. Financial Viability Assessment
+      4. Recommendations
+      5. Risk Score (0-100, where 0 is extremely risky and 100 is very safe)
+      `;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4-turbo-preview",
+        messages: [
+          { 
+            role: "system", 
+            content: "You are a business risk assessment expert specializing in analyzing business opportunities." 
+          },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 2500,
       });
+
+      const analysis = response.choices[0]?.message?.content || '';
+      
+      // Extract risk score from analysis
+      let riskScore = 50; // Default score
+      const scoreMatch = analysis.match(/Risk Score:?\s*(\d+)/i);
+      if (scoreMatch && scoreMatch[1]) {
+        riskScore = parseInt(scoreMatch[1], 10);
+        if (isNaN(riskScore) || riskScore < 0 || riskScore > 100) {
+          riskScore = 50; // Default if parsing fails
+        }
+      }
 
       // Update assessment with analysis
       const { error: saveError } = await supabase
         .from('assessments')
         .update({
-          analysis: analysisResult.content,
-          risk_score: analysisResult.riskScore,
+          analysis: analysis,
+          risk_score: riskScore,
           status: 'completed',
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -88,10 +142,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         await sendEmail({
           to: session.user.email,
           subject: 'Your SmartRisk Analysis is Ready',
-          businessName: assessment.business_details?.name,
-          businessType: assessment.business_details?.type,
-          riskScore: analysisResult.riskScore,
-          analysis: analysisResult.content
+          businessName: sectionData.business_details?.business_name || 'Your Business',
+          businessType: sectionData.business_details?.business_type || 'Business',
+          riskScore: riskScore,
+          analysis: analysis
         });
       } catch (emailError) {
         console.error('Error sending email notification:', emailError);
@@ -101,7 +155,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({
         success: true,
         message: 'Analysis completed successfully',
-        riskScore: analysisResult.riskScore
+        riskScore: riskScore
       });
 
     } catch (error) {
