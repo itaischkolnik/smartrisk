@@ -100,7 +100,7 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
 
     console.log('Extracting risk score...');
     // Extract risk score from the content
-    const riskScoreMatch = content.match(/risk score:?\s*(\d+)/i);
+    const riskScoreMatch = content.match(/ציון סיכון:?\s*(\d+)/i) || content.match(/risk score:?\s*(\d+)/i);
     
     if (!riskScoreMatch) {
       console.warn('Risk score not found in OpenAI response, using default score');

@@ -5,6 +5,16 @@ import { Assessment } from '../types/assessment';
 // Create a single instance of the Supabase client with proper configuration
 const supabase = createClientComponentClient();
 
+// Business type translations
+const businessTypeTranslations: Record<string, string> = {
+  'retail': 'קמעונאות',
+  'restaurant': 'מסעדנות',
+  'service': 'שירותים',
+  'manufacturing': 'ייצור',
+  'tech': 'טכנולוגיה',
+  'other': 'אחר'
+};
+
 // Helper function to ensure authenticated client
 const getAuthenticatedClient = async () => {
   const {
@@ -47,12 +57,13 @@ export async function getUserAssessments(userId: string) {
       }
 
       const businessDetails = sectionData?.data || {};
+      const businessType = businessDetails.business_type || 'other';
       
       // Merge the business details with the assessment
       return {
         ...assessment,
         business_name: businessDetails.business_name || assessment.business_name || 'עסק ללא שם',
-        business_type: businessDetails.business_type || 'לא צוין',
+        business_type: businessTypeTranslations[businessType] || 'לא צוין',
         business_field: businessDetails.business_field || 'לא צוין'
       };
     }));
@@ -212,20 +223,6 @@ export async function submitAssessmentForAnalysis(assessment: Assessment) {
       throw new Error(`Missing required sections: ${missingSections.join(', ')}`);
     }
 
-    // Update status in database
-    const { error: updateError } = await supabase
-      .from('assessments')
-      .update({
-        status: 'processing',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', assessment.id);
-
-    if (updateError) {
-      console.error('Error updating assessment status:', updateError);
-      throw updateError;
-    }
-
     // Call the analyze API endpoint
     const response = await fetch(`/api/assessment/${assessment.id}/analyze`, {
       method: 'POST',
@@ -250,29 +247,11 @@ export async function submitAssessmentForAnalysis(assessment: Assessment) {
       throw new Error(data.error || 'Analysis was not successful');
     }
 
-    return { success: true, data };
+    return data;
+
   } catch (error) {
     console.error('Error submitting assessment for analysis:', error);
-    
-    // Update status to reflect error
-    try {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      await supabase
-        .from('assessments')
-        .update({
-          status: 'failed',
-          error_message: errorMessage,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', assessment.id);
-    } catch (updateError) {
-      console.error('Error updating assessment status after failure:', updateError);
-    }
-      
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    };
+    throw error;
   }
 }
 
