@@ -23,7 +23,19 @@ const createServerSupabaseClient = () => {
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  timeout: 180000, // 3 minutes timeout
+  maxRetries: 3,
 });
+
+// Helper function to add timeout to promises
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]);
+}
+
+export const maxDuration = 300; // Set Next.js route handler timeout to 5 minutes
 
 export async function POST(request: Request) {
   try {
@@ -129,27 +141,35 @@ export async function POST(request: Request) {
       
       חשוב: יש לספק ניתוח מעמיק ומפורט בכל סעיף, תוך התייחסות לנתונים הספציפיים של העסק.`;
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-4-turbo-preview",
-        messages: [
-          {
-            role: "system",
-            content: "אתה מומחה לניתוח סיכונים עסקיים. ספק תובנות קצרות ופרקטיות בעברית נכונה וללא שגיאות דקדוק."
-          },
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.5,
-        max_tokens: 2500,
-      });
+      const response = await withTimeout(
+        openai.chat.completions.create({
+          model: "gpt-4-turbo-preview",
+          messages: [
+            {
+              role: "system",
+              content: "אתה מומחה לניתוח סיכונים עסקיים. ספק תובנות קצרות ופרקטיות בעברית נכונה וללא שגיאות דקדוק."
+            },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.5,
+          max_tokens: 2500,
+        }),
+        180000 // 3 minutes timeout
+      );
 
       const analysis = response.choices[0]?.message?.content || '';
       
+      if (!analysis) {
+        throw new Error('No analysis content received from OpenAI');
+      }
+
       // Extract risk score from analysis
       let riskScore = 50; // Default score
-      const scoreMatch = analysis.match(/Risk Score:?\s*(\d+)/i);
+      const scoreMatch = analysis.match(/ציון סיכון:?\s*(\d+)/i);
       if (scoreMatch && scoreMatch[1]) {
         riskScore = parseInt(scoreMatch[1], 10);
         if (isNaN(riskScore) || riskScore < 0 || riskScore > 100) {
+          console.warn('Invalid risk score received:', riskScore);
           riskScore = 50; // Default if parsing fails
         }
       }

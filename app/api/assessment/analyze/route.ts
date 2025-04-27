@@ -6,7 +6,19 @@ import OpenAI from 'openai';
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  timeout: 180000, // 3 minutes timeout
+  maxRetries: 3,
 });
+
+// Helper function to add timeout to promises
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]);
+}
+
+export const maxDuration = 300; // Set Next.js route handler timeout to 5 minutes
 
 export async function POST(request: Request) {
   try {
@@ -47,8 +59,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate analysis using OpenAI
-    const prompt = `
+    // Generate analysis using OpenAI with timeout
+    try {
+      const prompt = `
       אנא נתח את נתוני הערכת הסיכון העסקית הבאה וספק ניתוח מקיף:
       
       פרטי העסק:
@@ -91,62 +104,87 @@ export async function POST(request: Request) {
       
       חשוב: יש לספק ניתוח מעמיק ומפורט בכל סעיף, תוך התייחסות לנתונים הספציפיים של העסק.`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
-      messages: [
-        {
-          role: "system",
-          content: "אתה מומחה לניתוח סיכונים עסקיים. ספק תובנות קצרות ופרקטיות בעברית נכונה וללא שגיאות דקדוק."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.5,
-      max_tokens: 2500
-    });
+      const completion = await withTimeout(
+        openai.chat.completions.create({
+          model: "gpt-4-turbo-preview",
+          messages: [
+            {
+              role: "system",
+              content: "אתה מומחה לניתוח סיכונים עסקיים. ספק תובנות קצרות ופרקטיות בעברית נכונה וללא שגיאות דקדוק."
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          temperature: 0.5,
+          max_tokens: 2500
+        }),
+        180000 // 3 minutes timeout
+      );
 
-    const analysis = completion.choices[0]?.message?.content || '';
-    
-    // Extract risk score from analysis
-    let riskScore = 50; // Default score
-    const scoreMatch = analysis.match(/Risk Score:?\s*(\d+)/i);
-    if (scoreMatch && scoreMatch[1]) {
-      riskScore = parseInt(scoreMatch[1], 10);
-      if (isNaN(riskScore) || riskScore < 0 || riskScore > 100) {
-        riskScore = 50; // Default if parsing fails
+      const analysis = completion.choices[0]?.message?.content || '';
+      
+      if (!analysis) {
+        throw new Error('No analysis content received from OpenAI');
       }
-    }
 
-    // Update assessment with analysis
-    const { error: updateError } = await supabase
-      .from('assessments')
-      .update({
-        analysis: analysis,
-        risk_score: riskScore,
-        status: 'completed',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', assessmentId);
+      // Extract risk score from analysis
+      let riskScore = 50; // Default score
+      const scoreMatch = analysis.match(/ציון סיכון:?\s*(\d+)/i);
+      if (scoreMatch && scoreMatch[1]) {
+        riskScore = parseInt(scoreMatch[1], 10);
+        if (isNaN(riskScore) || riskScore < 0 || riskScore > 100) {
+          console.warn('Invalid risk score received:', riskScore);
+          riskScore = 50; // Default if parsing fails
+        }
+      }
 
-    if (updateError) {
-      console.error('Error saving analysis:', updateError);
+      // Update assessment with analysis
+      const { error: updateError } = await supabase
+        .from('assessments')
+        .update({
+          analysis: analysis,
+          risk_score: riskScore,
+          status: 'completed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', assessmentId);
+
+      if (updateError) {
+        console.error('Error saving analysis:', updateError);
+        return NextResponse.json(
+          { error: 'Failed to save analysis' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        analysis,
+        riskScore,
+      });
+    } catch (aiError) {
+      console.error('Error generating analysis with OpenAI:', aiError);
+      
+      // Update assessment status to error
+      await supabase
+        .from('assessments')
+        .update({
+          status: 'error',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', assessmentId);
+      
       return NextResponse.json(
-        { error: 'Failed to save analysis' },
+        { error: aiError instanceof Error ? aiError.message : 'Failed to generate analysis' },
         { status: 500 }
       );
     }
-
-    return NextResponse.json({
-      success: true,
-      analysis,
-      riskScore,
-    });
   } catch (error) {
     console.error('Error in analysis:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     );
   }
