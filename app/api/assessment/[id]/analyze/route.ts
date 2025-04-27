@@ -39,17 +39,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const supabase = createServerSupabaseClient();
 
     // Update status to processing
-    console.log('Updating assessment status to processing...');
+    console.log('Updating assessment status to analyzing...');
     const { error: updateError } = await supabase
       .from('assessments')
       .update({ 
-        status: 'processing',
+        status: 'analyzed',
         updated_at: new Date().toISOString()
       })
       .eq('id', id);
 
     if (updateError) {
-      console.error('Error updating status to processing:', updateError);
+      console.error('Error updating status:', updateError);
       return NextResponse.json({ error: 'Failed to update assessment status' }, { status: 500 });
     }
 
@@ -62,7 +62,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     if (sectionsError) {
       console.error('Error fetching assessment sections:', sectionsError);
-      await updateAssessmentStatus(supabase, id, 'failed', 'Failed to fetch assessment data');
+      await updateAssessmentStatus(supabase, id, 'draft', 'Failed to fetch assessment data');
       return NextResponse.json({ error: 'Failed to fetch assessment data' }, { status: 500 });
     }
 
@@ -85,6 +85,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         files: [] // We'll handle files later if needed
       };
 
+      console.log('Data being sent to OpenAI:', JSON.stringify(analysisData, null, 2));
+
       console.log('Calling OpenAI service...');
       const analysisResult = await generateBusinessAnalysis(analysisData);
       console.log('Analysis generated successfully');
@@ -96,7 +98,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         .update({
           analysis: analysisResult.content,
           risk_score: analysisResult.riskScore,
-          status: 'completed',
+          status: 'analyzed',
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -135,7 +137,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     } catch (error) {
       console.error('Error in analysis process:', error);
-      await updateAssessmentStatus(supabase, id, 'failed', error instanceof Error ? error.message : 'Analysis generation failed');
+      await updateAssessmentStatus(supabase, id, 'draft', error instanceof Error ? error.message : 'Analysis generation failed');
       return NextResponse.json({ 
         error: 'Failed to generate analysis',
         details: error instanceof Error ? error.message : 'Unknown error'
@@ -151,7 +153,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 }
 
-async function updateAssessmentStatus(supabase: any, id: string, status: string, errorMessage?: string) {
+async function updateAssessmentStatus(supabase: any, id: string, status: 'draft' | 'completed' | 'analyzed', errorMessage?: string) {
   try {
     console.log(`Updating assessment ${id} status to ${status}${errorMessage ? ': ' + errorMessage : ''}`);
     const update: any = {
