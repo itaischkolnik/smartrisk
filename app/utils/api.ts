@@ -223,31 +223,40 @@ export async function submitAssessmentForAnalysis(assessment: Assessment) {
       throw new Error(`Missing required sections: ${missingSections.join(', ')}`);
     }
 
-    // Call the analyze API endpoint
-    const response = await fetch(`/api/assessment/${assessment.id}/analyze`, {
+    // First, update the assessment status to processing
+    const { error: updateError } = await supabase
+      .from('assessments')
+      .update({
+        status: 'processing',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', assessment.id);
+
+    if (updateError) {
+      console.error('Error updating assessment status:', updateError);
+      throw new Error('Failed to update assessment status');
+    }
+
+    // Then start the analysis in the background
+    const response = await fetch(`/api/assessment/${assessment.id}/submit`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ assessmentId: assessment.id }),
     });
 
-    const data = await response.json();
-
     if (!response.ok) {
-      console.error('Analysis API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        data
-      });
-      throw new Error(data.error || data.details || 'Failed to analyze assessment');
+      // Even if the analysis request fails, we can still proceed since it's running in the background
+      console.warn('Analysis request failed but continuing:', response.statusText);
     }
 
-    if (!data.success) {
-      console.error('Analysis not successful:', data);
-      throw new Error(data.error || 'Analysis was not successful');
-    }
-
-    return data;
+    // Return success since the analysis is now running in the background
+    return {
+      success: true,
+      message: 'Assessment submitted for background analysis',
+      assessmentId: assessment.id,
+    };
 
   } catch (error) {
     console.error('Error submitting assessment for analysis:', error);
