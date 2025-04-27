@@ -52,11 +52,11 @@ export async function POST(request: Request) {
 
     // Send email with analysis
     if (!session.user.email) {
-      return NextResponse.json(
+        return NextResponse.json(
         { error: 'User email not found' },
         { status: 400 }
-      );
-    }
+        );
+      }
 
     const { success, error: emailError } = await sendEmail({
       to: session.user.email,

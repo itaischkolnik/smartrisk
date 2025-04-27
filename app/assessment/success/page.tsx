@@ -9,7 +9,7 @@ import AnalysisStatus from '../../components/assessment/AnalysisStatus';
 export default function SuccessPage() {
   const searchParams = useSearchParams();
   const assessmentId = searchParams.get('id');
-
+  
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-3xl mx-auto px-4">
