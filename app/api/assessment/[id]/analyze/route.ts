@@ -77,70 +77,25 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     console.log('Available sections:', Object.keys(sectionData));
 
     try {
-      // Format assessment data for OpenAI
-      console.log('Preparing OpenAI prompt...');
-      const prompt = `
-      Please analyze this business risk assessment data and provide a comprehensive analysis:
-      
-      Business Details:
-      ${JSON.stringify(sectionData.business_details || {}, null, 2)}
-      
-      Personal Information:
-      ${JSON.stringify(sectionData.personal_details || {}, null, 2)}
-      
-      Personal Questionnaire:
-      ${JSON.stringify(sectionData.personal_questionnaire || {}, null, 2)}
-      
-      Financial Data:
-      ${JSON.stringify(sectionData.financial_data || {}, null, 2)}
-      
-      SWOT Analysis:
-      ${JSON.stringify(sectionData.swot_analysis || {}, null, 2)}
-      
-      Please provide:
-      1. Executive Summary (2-3 paragraphs)
-      2. Detailed Risk Analysis (by business area)
-      3. Financial Viability Assessment
-      4. Recommendations
-      5. Risk Score (0-100, where 0 is extremely risky and 100 is very safe)
-      `;
+      // Format data for OpenAI analysis
+      const analysisData = {
+        businessDetails: sectionData.business_details || {},
+        swotAnalysis: sectionData.swot_analysis || {},
+        personalQuestionnaire: sectionData.personal_questionnaire || {},
+        files: [] // We'll handle files later if needed
+      };
 
-      console.log('Calling OpenAI API...');
-      const response = await openai.chat.completions.create({
-        model: "gpt-4-turbo-preview",
-        messages: [
-          { 
-            role: "system", 
-            content: "You are a business risk assessment expert specializing in analyzing business opportunities." 
-          },
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 2500,
-      });
-
-      console.log('OpenAI response received');
-      const analysis = response.choices[0]?.message?.content || '';
-      
-      // Extract risk score from analysis
-      console.log('Extracting risk score...');
-      let riskScore = 50; // Default score
-      const scoreMatch = analysis.match(/Risk Score:?\s*(\d+)/i);
-      if (scoreMatch && scoreMatch[1]) {
-        riskScore = parseInt(scoreMatch[1], 10);
-        if (isNaN(riskScore) || riskScore < 0 || riskScore > 100) {
-          riskScore = 50; // Default if parsing fails
-        }
-      }
-      console.log('Risk score:', riskScore);
+      console.log('Calling OpenAI service...');
+      const analysisResult = await generateBusinessAnalysis(analysisData);
+      console.log('Analysis generated successfully');
 
       // Update assessment with analysis
       console.log('Saving analysis results...');
       const { error: saveError } = await supabase
         .from('assessments')
         .update({
-          analysis: analysis,
-          risk_score: riskScore,
+          analysis: analysisResult.content,
+          risk_score: analysisResult.riskScore,
           status: 'completed',
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -160,8 +115,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           subject: 'Your SmartRisk Analysis is Ready',
           businessName: sectionData.business_details?.business_name || 'Your Business',
           businessType: sectionData.business_details?.business_type || 'Business',
-          riskScore: riskScore,
-          analysis: analysis
+          riskScore: analysisResult.riskScore,
+          analysis: analysisResult.content
         });
         console.log('Email notification sent');
       } catch (emailError) {
@@ -175,7 +130,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({
         success: true,
         message: 'Analysis completed successfully',
-        riskScore: riskScore
+        riskScore: analysisResult.riskScore
       });
 
     } catch (error) {
