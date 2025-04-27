@@ -74,17 +74,23 @@ export async function POST(request: Request) {
       5. Risk Score (0-100, where 0 is extremely risky and 100 is very safe)
     `;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4-turbo-preview",
       messages: [
-        { role: "system", content: "You are a business risk assessment expert specializing in analyzing business opportunities." },
-        { role: "user", content: prompt }
+        {
+          role: "system",
+          content: "אתה מומחה לניתוח סיכונים עסקיים. ספק תובנות קצרות ופרקטיות בעברית נכונה וללא שגיאות דקדוק."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
       ],
-      temperature: 0.7,
-      max_tokens: 2500,
+      temperature: 0.5,
+      max_tokens: 2500
     });
 
-    const analysis = response.choices[0]?.message?.content || '';
+    const analysis = completion.choices[0]?.message?.content || '';
     
     // Extract risk score from analysis
     let riskScore = 50; // Default score

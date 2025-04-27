@@ -113,12 +113,15 @@ export async function POST(request: Request) {
       `;
 
       const response = await openai.chat.completions.create({
-        model: "gpt-4-turbo",
+        model: "gpt-4-turbo-preview",
         messages: [
-          { role: "system", content: "You are a business risk assessment expert specializing in analyzing business opportunities." },
+          {
+            role: "system",
+            content: "אתה מומחה לניתוח סיכונים עסקיים. ספק תובנות קצרות ופרקטיות בעברית נכונה וללא שגיאות דקדוק."
+          },
           { role: "user", content: prompt }
         ],
-        temperature: 0.7,
+        temperature: 0.5,
         max_tokens: 2500,
       });
 

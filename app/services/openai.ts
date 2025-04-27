@@ -72,11 +72,11 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
     // Set a 2-minute timeout for the OpenAI API call
     const completion = await withTimeout(
       openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4-turbo-preview",
         messages: [
           {
             role: "system",
-            content: "אתה מומחה לניתוח סיכונים עסקיים. ספק תובנות קצרות ופרקטיות בעברית."
+            content: "אתה מומחה לניתוח סיכונים עסקיים. ספק תובנות קצרות ופרקטיות בעברית נכונה וללא שגיאות דקדוק."
           },
           {
             role: "user",
@@ -84,7 +84,7 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
           }
         ],
         temperature: 0.5,
-        max_tokens: 1000
+        max_tokens: 2500
       }),
       120000 // 2 minutes timeout
     );
