@@ -493,15 +493,101 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
       if (error) {
         throw new Error(error.message);
       }
+
+      if (!assessment?.id) {
+        throw new Error('No assessment ID returned from save');
+      }
+
+      // Save all sections before submitting
+      const now = new Date().toISOString();
+      const sectionData = {
+        assessment_id: assessment.id,
+        created_at: now,
+        updated_at: now,
+      };
+
+      // Save personal details
+      await saveAssessmentData({
+        ...sectionData,
+        section: 'personal_details',
+        data: {
+          full_name: data.full_name || '',
+          age: data.age || '',
+          location: data.location || '',
+          marital_status: data.marital_status || '',
+          occupation: data.occupation || '',
+          self_introduction: data.self_introduction || '',
+        },
+      });
+
+      // Save personal questionnaire
+      await saveAssessmentData({
+        ...sectionData,
+        section: 'personal_questionnaire',
+        data: {
+          life_experience: data.life_experience || '',
+          motivation: data.motivation || '',
+          financial_capability: data.financial_capability || '',
+          five_year_goals: data.five_year_goals || '',
+        },
+      });
+
+      // Save business details
+      await saveAssessmentData({
+        ...sectionData,
+        section: 'business_details',
+        data: {
+          business_name: data.business_name || '',
+          business_type: data.business_type || '',
+          industry: data.industry || '',
+          establishment_date: data.establishment_date || '',
+          employee_count: data.employee_count || '',
+          business_structure: data.business_structure || '',
+          business_location: data.business_location || '',
+          operating_hours: data.operating_hours || '',
+          property_details: data.property_details || '',
+          sale_reason: data.sale_reason || '',
+          legal_issues: data.legal_issues || '',
+          additional_notes: data.additional_notes || '',
+        },
+      });
+
+      // Save financial data
+      await saveAssessmentData({
+        ...sectionData,
+        section: 'financial_data',
+        data: {
+          asking_price: data.asking_price || '',
+          annual_revenue: data.annual_revenue || '',
+          operating_profit: data.operating_profit || '',
+          net_profit: data.net_profit || '',
+          inventory_value: data.inventory_value || '',
+          equipment_value: data.equipment_value || '',
+          monthly_salary_expenses: data.monthly_salary_expenses || '',
+          monthly_expenses: data.monthly_expenses || '',
+          payment_terms: data.payment_terms || '',
+          financial_notes: data.financial_notes || '',
+        },
+      });
+
+      // Save SWOT analysis
+      await saveAssessmentData({
+        ...sectionData,
+        section: 'swot_analysis',
+        data: {
+          strengths: data.strengths || '',
+          weaknesses: data.weaknesses || '',
+          opportunities: data.opportunities || '',
+          threats: data.threats || '',
+        },
+      });
       
       // Then submit for analysis
-      if (assessment) {
-        const result = await submitAssessmentForAnalysis(assessment);
-        if (result.success) {
-          router.push(`/assessment/success?id=${assessment.id}`);
-        } else {
-          throw new Error(result.error || 'Failed to submit assessment for analysis');
-        }
+      const result = await submitAssessmentForAnalysis(assessment);
+      if (result.success) {
+        router.push(`/assessment/success?id=${assessment.id}`);
+      } else {
+        throw new Error(result.error || 'Failed to submit assessment for analysis');
       }
     } catch (error) {
       console.error('Error submitting assessment:', error);
