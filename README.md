@@ -155,6 +155,80 @@ yarn dev
 - [ ] Preview support for common file types
 - [ ] Enhanced progress indicators
 
+## 🚨 Common Issues & Solutions
+
+### White-on-White Text Issue in Admin Pages
+
+**Problem**: Text appears invisible (white on white background) in admin pages, particularly in headers and other colored sections.
+
+**Root Cause**: The `app/styles/admin-only.css` file contains global CSS overrides that force all text to be dark colors and all backgrounds to be white, regardless of the Tailwind classes applied.
+
+**Solution**: The CSS has been updated to be more specific and only apply default colors when no specific color classes are set.
+
+#### How to Prevent This Issue in Future Pages:
+
+1. **For Admin Pages with Colored Backgrounds**:
+   ```jsx
+   // ✅ CORRECT - Use specific classes and inline styles
+   <div className="bg-gradient-to-r from-red-600 to-red-800 text-white py-8 admin-header" 
+        style={{ background: 'linear-gradient(to right, #dc2626, #991b1b) !important' }}>
+     <h1 className="text-2xl font-bold text-white">Title</h1>
+     <p className="text-red-100">Subtitle</p>
+   </div>
+   ```
+
+2. **Add Scoped CSS for Critical Sections**:
+   ```jsx
+   <style jsx>{`
+     .admin-header {
+       background: linear-gradient(to right, #dc2626, #991b1b) !important;
+     }
+     .admin-header * {
+       color: white !important;
+     }
+     .admin-header .text-red-100 {
+       color: #fecaca !important;
+     }
+   `}</style>
+   ```
+
+3. **CSS Rules to Avoid**:
+   ```css
+   /* ❌ DON'T - Global overrides that affect all elements */
+   .admin-page {
+     color: #1f2937 !important;
+     background-color: #ffffff !important;
+   }
+   ```
+
+4. **CSS Rules to Use**:
+   ```css
+   /* ✅ DO - Specific overrides that only apply when no color class is set */
+   .admin-page h1:not([class*="text-"]) {
+     color: #111827 !important;
+   }
+   .admin-page p:not([class*="text-"]) {
+     color: #374151 !important;
+   }
+   ```
+
+#### Testing Checklist:
+- [ ] Check text visibility on colored backgrounds
+- [ ] Verify icons are visible against backgrounds
+- [ ] Test with different color schemes
+- [ ] Ensure contrast ratios meet accessibility standards
+
+#### Debugging Steps:
+1. **Inspect Element**: Use browser dev tools to check if CSS is being overridden
+2. **Check CSS Specificity**: Ensure your color classes have higher specificity
+3. **Use Inline Styles**: For critical elements, use inline styles with `!important`
+4. **Add Scoped CSS**: Use `styled-jsx` for page-specific overrides
+
+#### Files to Check When Issues Occur:
+- `app/styles/admin-only.css` - Check for global overrides
+- `app/components/layout/AdminLayout.tsx` - Verify admin-page class usage
+- `app/globals.css` - Check for conflicting global styles
+
 ## 📄 License
 [Your License Here]
 
@@ -207,3 +281,22 @@ profiles table schema:
 | avatar_url  | text                     |
 | created_at  | timestamp with time zone |
 | updated_at  | timestamp with time zone |
+
+analyses table schema:
+
+| column_name          | data_type                |
+| -------------------- | ------------------------ |
+| id                   | uuid                     |
+| assessment_id        | uuid                     |
+| user_id              | uuid                     |
+| status               | USER-DEFINED             |
+| overall_risk_score   | numeric                  |
+| business_risk_score  | numeric                  |
+| financial_risk_score | numeric                  |
+| market_risk_score    | numeric                  |
+| swot_risk_score      | numeric                  |
+| analysis_content     | jsonb                    |
+| pdf_url              | text                     |
+| created_at           | timestamp with time zone |
+| updated_at           | timestamp with time zone |
+| error_message        | text                     |

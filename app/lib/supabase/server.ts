@@ -1,4 +1,4 @@
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -9,5 +9,5 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 export const createServerSupabaseClient = () => {
-  return createServerComponentClient({ cookies });
+  return createRouteHandlerClient({ cookies });
 }; 

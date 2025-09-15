@@ -4,7 +4,6 @@ import React from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { FiCheckCircle } from 'react-icons/fi';
-import AnalysisStatus from '../../components/assessment/AnalysisStatus';
 
 export default function SuccessPage() {
   const searchParams = useSearchParams();
@@ -22,26 +21,33 @@ export default function SuccessPage() {
               השאלון נשלח בהצלחה!
             </h1>
             <p className="text-gray-600">
-              תודה שמילאת את השאלון. אנחנו מנתחים את המידע כעת.
+              תודה שמילאת את השאלון. המידע שלך נשלח בהצלחה למערכת שלנו.
             </p>
           </div>
 
           {assessmentId && (
-            <div className="mb-8">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">
-                סטטוס הניתוח
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+              <h2 className="text-xl font-medium text-blue-700 mb-2">
+                מספר הערכה
               </h2>
-              <AnalysisStatus assessmentId={assessmentId} />
+              <p className="text-blue-600 mb-4">
+                מספר ההערכה שלך: <span className="font-bold">{assessmentId}</span>
+              </p>
+              <p className="text-gray-600">
+                המידע שלך נשלח בהצלחה למערכת העיבוד שלנו יחד עם כל הקבצים שהעלית. 
+                אנחנו נבדוק את הפרטים ונחזור אליך בהקדם.
+              </p>
             </div>
           )}
 
           <div className="text-center">
             <p className="text-gray-600 mb-4">
-              תקבל אימייל כשהניתוח יהיה מוכן. בינתיים, תוכל לחזור ללוח הבקרה.
+              תקבל עדכון על התקדמות הבדיקה. בינתיים, תוכל לחזור ללוח הבקרה.
             </p>
             <Link
               href="/dashboard"
-              className="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200"
+              style={{ backgroundColor: '#4285F4', border: '2px solid #4285F4' }}
+              className="inline-block text-white font-bold px-6 py-3 rounded-lg hover:bg-[#3367d6] transition-colors duration-200"
             >
               חזרה ללוח הבקרה
             </Link>

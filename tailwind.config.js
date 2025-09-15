@@ -1,10 +1,24 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: [
+  content: {
+    files: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+    safelist: [
+      'bg-blue-600',
+      'border-blue-600',
+      'text-blue-600',
+      'text-white',
+      'ring-blue-100',
+      'cursor-pointer',
+      'group-hover:bg-blue-600',
+      'group-hover:border-blue-600',
+      'group-hover:text-white',
+      'group-hover:text-blue-600',
+    ],
+  },
   theme: {
     extend: {
       colors: {

@@ -223,22 +223,69 @@ export async function submitAssessmentForAnalysis(assessment: Assessment) {
       throw new Error(`Missing required sections: ${missingSections.join(', ')}`);
     }
 
-    // First, update the assessment status to processing
-    const { error: updateError } = await supabase
-      .from('assessments')
-      .update({
-        status: 'processing',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', assessment.id);
+    // Call the analyze API endpoint
+    const response = await fetch(`/api/assessment/${assessment.id}/analyze`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
-    if (updateError) {
-      console.error('Error updating assessment status:', updateError);
-      throw new Error('Failed to update assessment status');
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Analysis API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        data
+      });
+      throw new Error(data.error || data.details || 'Failed to analyze assessment');
     }
 
-    // Then start the analysis in the background
-    const response = await fetch(`/api/assessment/${assessment.id}/submit`, {
+    if (!data.success) {
+      console.error('Analysis not successful:', data);
+      throw new Error(data.error || 'Analysis was not successful');
+    }
+
+    return data;
+
+  } catch (error) {
+    console.error('Error submitting assessment for analysis:', error);
+    throw error;
+  }
+}
+
+// Submit assessment to webhook instead of OpenAI analysis
+export async function submitAssessmentToWebhook(assessment: Assessment) {
+  try {
+    console.log('Starting assessment webhook submission...', { assessmentId: assessment.id });
+
+    // First validate that we have all required sections
+    const { data: sections, error: sectionsError } = await supabase
+      .from('assessment_data')
+      .select('*')
+      .eq('assessment_id', assessment.id);
+
+    if (sectionsError) {
+      console.error('Error fetching assessment sections:', sectionsError);
+      throw new Error('Failed to validate assessment sections');
+    }
+
+    const sectionMap = sections?.reduce((acc, section) => {
+      acc[section.section] = section.data;
+      return acc;
+    }, {} as Record<string, any>) || {};
+
+    // Validate required sections
+    const requiredSections = ['business_details', 'swot_analysis', 'personal_questionnaire'];
+    const missingSections = requiredSections.filter(section => !sectionMap[section]);
+    
+    if (missingSections.length > 0) {
+      throw new Error(`Missing required sections: ${missingSections.join(', ')}`);
+    }
+
+    // Call the webhook submission API endpoint
+    const response = await fetch('/api/assessment/submit-webhook', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -246,20 +293,26 @@ export async function submitAssessmentForAnalysis(assessment: Assessment) {
       body: JSON.stringify({ assessmentId: assessment.id }),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      // Even if the analysis request fails, we can still proceed since it's running in the background
-      console.warn('Analysis request failed but continuing:', response.statusText);
+      console.error('Webhook submission API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        data
+      });
+      throw new Error(data.error || data.details || 'Failed to submit to webhook');
     }
 
-    // Return success since the analysis is now running in the background
-    return {
-      success: true,
-      message: 'Assessment submitted for background analysis',
-      assessmentId: assessment.id,
-    };
+    if (!data.success) {
+      console.error('Webhook submission not successful:', data);
+      throw new Error(data.error || 'Webhook submission was not successful');
+    }
+
+    return data;
 
   } catch (error) {
-    console.error('Error submitting assessment for analysis:', error);
+    console.error('Error submitting assessment to webhook:', error);
     throw error;
   }
 }

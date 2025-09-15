@@ -6,7 +6,7 @@ const Footer = () => {
   return (
     <footer className="bg-gray-900 text-white py-16">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center md:text-right">
           <div>
             <div className="mb-6">
               <Image
@@ -18,7 +18,7 @@ const Footer = () => {
               />
             </div>
             <p className="text-gray-400 mb-6 leading-relaxed">פלטפורמה מבוססת AI לניתוח והערכת סיכונים וכדאיות של רכישת עסק</p>
-            <div className="flex space-x-4 space-x-reverse">
+            <div className="flex space-x-4 space-x-reverse justify-center md:justify-start">
               <a href="#" className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-primary transition-all no-underline">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" style={{ color: '#3675ed' }} fill="currentColor" className="bi bi-facebook" viewBox="0 0 16 16">
                   <path d="M16 8.049c0-4.446-3.582-8.05-8-8.05C3.58 0-.002 3.603-.002 8.05c0 4.017 2.926 7.347 6.75 7.951v-5.625h-2.03V8.05H6.75V6.275c0-2.017 1.195-3.131 3.022-3.131.876 0 1.791.157 1.791.157v1.98h-1.009c-.993 0-1.303.621-1.303 1.258v1.51h2.218l-.354 2.326H9.25V16c3.824-.604 6.75-3.934 6.75-7.951z"/>
@@ -39,36 +39,36 @@ const Footer = () => {
           
           <div>
             <h4 className="text-lg font-bold mb-6">ניווט מהיר</h4>
-            <ul className="space-y-4">
-              <li>
-                <Link href="/" className="footer-link no-underline">
-                  דף הבית
-                </Link>
-              </li>
-              <li>
-                <Link href="/about" className="footer-link no-underline">
-                  אודות
-                </Link>
-              </li>
-              <li>
-                <Link href="/features" className="footer-link no-underline">
-                  תכונות
-                </Link>
-              </li>
-              <li>
-                <Link href="/pricing" className="footer-link no-underline">
-                  תמחור
-                </Link>
-              </li>
-            </ul>
+                         <ul className="space-y-4 list-none">
+               <li>
+                 <Link href="/" className="footer-link no-underline">
+                   דף הבית
+                 </Link>
+               </li>
+               <li>
+                 <Link href="/about" className="footer-link no-underline">
+                   אודות
+                 </Link>
+               </li>
+               <li>
+                 <Link href="/features" className="footer-link no-underline">
+                   תכונות
+                 </Link>
+               </li>
+               <li>
+                 <Link href="/pricing" className="footer-link no-underline">
+                   תמחור
+                 </Link>
+               </li>
+             </ul>
           </div>
           
           <div>
             <h4 className="text-lg font-bold mb-6">משאבים</h4>
             <ul className="space-y-4">
               <li>
-                <Link href="/blog" className="footer-link no-underline">
-                  בלוג
+                <Link href="/articles" className="footer-link no-underline">
+                  מאמרים
                 </Link>
               </li>
               <li>
@@ -77,7 +77,7 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link href="/support" className="footer-link no-underline">
+                <Link href="/contact" className="footer-link no-underline">
                   תמיכה
                 </Link>
               </li>
@@ -96,27 +96,27 @@ const Footer = () => {
           
           <div>
             <h4 className="text-lg font-bold mb-6">צור קשר</h4>
-            <ul className="space-y-4 text-gray-400">
-              <li className="flex items-center gap-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" style={{ color: '#3675ed' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                </svg>
-                <span>03-1234567</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" style={{ color: '#3675ed' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                <span>info@smartrisk.co.il</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" style={{ color: '#3675ed' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span>רחוב הברזל 3, תל אביב</span>
-              </li>
-            </ul>
+                         <ul className="space-y-4 text-gray-400">
+                               <li className="flex items-center gap-1 md:gap-3 justify-center md:justify-start">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" style={{ color: '#3675ed' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  <span>03-5252134</span>
+                </li>
+                <li className="flex items-center gap-1 md:gap-3 justify-center md:justify-start">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" style={{ color: '#3675ed' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <span>info@smartrisk.co.il</span>
+                </li>
+                <li className="flex items-center gap-1 md:gap-3 justify-center md:justify-start">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" style={{ color: '#3675ed' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span>רחוב הברזל 3, תל אביב</span>
+                </li>
+             </ul>
           </div>
         </div>
         

@@ -69,7 +69,7 @@ const Alert: React.FC<AlertProps> = ({ isOpen, onClose, message, type = 'info' }
             <p className="text-xl font-bold mb-6">{message}</p>
             <button
               onClick={onClose}
-              className={`w-full ${getButtonStyle()} font-bold py-3 px-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 text-lg shadow-lg`}
+              className={`w-full cursor-pointer hover:cursor-pointer ${getButtonStyle()} font-bold py-3 px-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 text-lg shadow-lg`}
             >
               אישור
             </button>

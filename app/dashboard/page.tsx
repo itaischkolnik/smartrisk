@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import { useAuth } from '../contexts/AuthContext';
+import { useAssessmentPermissions } from '../hooks/useAssessmentPermissions';
 import { getUserAssessments } from '../utils/api';
 import { Assessment } from '../types/assessment';
-import { FiPlus, FiFileText, FiAlertCircle, FiCheckCircle, FiClock } from 'react-icons/fi';
+import { FiPlus, FiFileText, FiAlertCircle, FiCheckCircle, FiClock, FiBarChart } from 'react-icons/fi';
 
-type AssessmentStatus = 'draft' | 'submitted' | 'processing' | 'completed' | 'analyzed';
+type AssessmentStatus = 'draft' | 'submitted' | 'processing' | 'completed' | 'analyzed' | 'submitted_to_webhook';
 
 interface DashboardAssessment extends Omit<Assessment, 'status'> {
   status: AssessmentStatus;
@@ -19,17 +20,23 @@ interface DashboardAssessment extends Omit<Assessment, 'status'> {
 
 export default function Dashboard() {
   const { user, isLoading: authLoading, session } = useAuth();
+  const permissions = useAssessmentPermissions();
   const router = useRouter();
   const [assessments, setAssessments] = useState<DashboardAssessment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+
   // Handle authentication state
   useEffect(() => {
+    console.log('Dashboard auth state:', { authLoading, hasSession: !!session, user: session?.user?.email });
+
+    // Simply rely on middleware to redirect unauthenticated users.
+    // If there's no session and we're not loading, we can display a loading state here.
     if (!authLoading && !session) {
-      router.replace('/');
+      setLoading(false);
     }
-  }, [session, authLoading, router]);
+  }, [session, authLoading]);
 
   // Fetch assessments
   useEffect(() => {
@@ -109,6 +116,7 @@ export default function Dashboard() {
       case 'draft':
         return <FiFileText style={{ color: '#3b82f6' }} />;
       case 'submitted':
+      case 'submitted_to_webhook':
         return <FiClock className="text-yellow-500" />;
       case 'processing':
         return <FiClock className="text-blue-500" />;
@@ -123,9 +131,11 @@ export default function Dashboard() {
   const getStatusText = (status: AssessmentStatus) => {
     switch (status) {
       case 'draft':
-        return 'טיוטה';
+        return 'בטיוטא';
       case 'submitted':
         return 'הוגש';
+      case 'submitted_to_webhook':
+        return 'נשלחה';
       case 'processing':
         return 'בעיבוד';
       case 'completed':
@@ -159,59 +169,121 @@ export default function Dashboard() {
                 ברוך הבא, {user?.user_metadata?.full_name || 'משתמש'}! הנה ההערכות שלך.
               </p>
             </div>
-            <div className="mt-4 md:mt-0 flex justify-center">
-              <Link
-                href="/assessment/new"
-                className="inline-flex items-center justify-center px-6 py-3 font-bold rounded-lg hover:opacity-90 transition-colors shadow-md border-2"
-                style={{ 
-                  backgroundColor: '#3b82f6', 
-                  color: 'white',
-                  borderColor: '#3b82f6',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-                }}
-              >
-                <FiPlus className="ml-2" size={18} />
-                צור הערכת עסק
-              </Link>
-            </div>
+                         <div className="mt-4 md:mt-0 flex justify-center">
+               {permissions.canCreateAssessment ? (
+                 <Link
+                   href="/assessment/new"
+                   className="inline-flex items-center justify-center px-6 py-3 font-bold rounded-lg hover:opacity-90 transition-colors shadow-md border-2"
+                   style={{ 
+                     backgroundColor: '#3b82f6', 
+                     color: 'white',
+                     borderColor: '#3b82f6',
+                     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                   }}
+                 >
+                   <FiPlus className="ml-2" size={18} />
+                   צור הערכת עסק
+                 </Link>
+                               ) : (
+                  <div className="text-center">
+                    <div className="text-sm text-gray-600 mb-2">
+                      {permissions.subscription === 'חינם' 
+                        ? 'לא ניתן להעלות קבצים בחבילה חינמית'
+                        : 'השתמשת בכל ההערכות השנתיות שלך'
+                      }
+                    </div>
+                   <Link
+                     href="/pricing"
+                     className="inline-flex items-center justify-center px-6 py-3 font-bold rounded-lg hover:opacity-90 transition-colors shadow-md border-2"
+                     style={{ 
+                       backgroundColor: '#10b981', 
+                       color: 'white',
+                       borderColor: '#10b981',
+                       boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                     }}
+                   >
+                     שדרג חבילה
+                   </Link>
+                 </div>
+               )}
+             </div>
           </div>
 
-          {/* Basic stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-blue-700 font-medium">סה"כ הערכות</p>
-                  <p className="text-2xl font-bold text-blue-900">{assessments.length}</p>
-                </div>
-                <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                  <FiFileText className="text-blue-600" size={24} />
-                </div>
-              </div>
-            </div>
-            <div className="bg-green-50 rounded-lg p-4 border border-green-100">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-green-700 font-medium">הערכות שהושלמו</p>
-                  <p className="text-2xl font-bold text-green-900">{assessments.filter(a => a.status === 'completed').length}</p>
-                </div>
-                <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                  <FiCheckCircle className="text-green-600" size={24} />
-                </div>
-              </div>
-            </div>
-            <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-100">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-yellow-700 font-medium">הערכות בתהליך</p>
-                  <p className="text-2xl font-bold text-yellow-900">{assessments.filter(a => a.status === 'processing' || a.status === 'submitted').length}</p>
-                </div>
-                <div className="h-12 w-12 rounded-full bg-yellow-100 flex items-center justify-center">
-                  <FiClock className="text-yellow-600" size={24} />
-                </div>
-              </div>
-            </div>
-          </div>
+                     {/* Basic stats */}
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+             <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+               <div className="flex justify-between items-center">
+                 <div>
+                   <p className="text-sm text-blue-700 font-medium">סה"כ הערכות</p>
+                   <p className="text-2xl font-bold text-blue-900">{assessments.length}</p>
+                 </div>
+                 <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
+                   <FiFileText className="text-blue-600" size={24} />
+                 </div>
+               </div>
+             </div>
+             <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+               <div className="flex justify-between items-center">
+                 <div>
+                   <p className="text-sm text-green-700 font-medium">הערכות שהושלמו</p>
+                   <p className="text-2xl font-bold text-green-900">{assessments.filter(a => a.status === 'completed').length}</p>
+                 </div>
+                 <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                   <FiCheckCircle className="text-green-600" size={24} />
+                 </div>
+               </div>
+             </div>
+             <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-100">
+               <div className="flex justify-between items-center">
+                 <div>
+                   <p className="text-sm text-yellow-700 font-medium">הערכות בתהליך</p>
+                   <p className="text-2xl font-bold text-yellow-900">{assessments.filter(a => a.status === 'processing' || a.status === 'submitted' || a.status === 'submitted_to_webhook').length}</p>
+                 </div>
+                 <div className="h-12 w-12 rounded-full bg-yellow-100 flex items-center justify-center">
+                   <FiClock className="text-yellow-600" size={24} />
+                 </div>
+               </div>
+             </div>
+           </div>
+
+           {/* Assessment Usage Info */}
+           {!permissions.isLoading && (
+             <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+               <div className="flex items-center justify-between">
+                 <div className="flex items-center space-x-3 rtl:space-x-reverse">
+                   <FiBarChart className="h-6 w-6 text-blue-600" />
+                   <div>
+                     <h3 className="text-lg font-semibold text-blue-900">מצב החבילה שלך</h3>
+                                           <p className="text-sm text-blue-700">
+                        {permissions.subscription === 'חינם' 
+                          ? 'חבילה חינמית - ניתן ליצור הערכות ללא העלאת קבצים'
+                          : `חבילת ${permissions.subscription} - ${permissions.assessmentsRemaining} הערכות נותרו מתוך ${permissions.maxAssessments}`
+                        }
+                      </p>
+                   </div>
+                 </div>
+                 {permissions.subscription !== 'חינם' && (
+                   <div className="text-right">
+                     <div className="text-2xl font-bold text-blue-900">
+                       {permissions.assessmentsRemaining}
+                     </div>
+                     <div className="text-sm text-blue-600">נותרו</div>
+                   </div>
+                 )}
+               </div>
+               
+               {permissions.subscription === 'חינם' && (
+                 <div className="mt-4 flex justify-center">
+                   <Link
+                     href="/pricing"
+                     className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                   >
+                     שדרג חבילה
+                   </Link>
+                 </div>
+               )}
+             </div>
+           )}
         </div>
 
         {/* Assessments section */}
@@ -270,26 +342,49 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <div className="bg-gradient-to-br from-white to-blue-50 rounded-xl border border-blue-100 p-8 text-center">
-              <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                <FiFileText className="text-blue-500" size={24} />
-              </div>
-              <h3 className="text-xl font-medium text-gray-900 mb-2">אין הערכות עדיין</h3>
-              <p className="text-gray-600 mb-6">התחל ביצירת הערכת עסק חדשה כדי לנתח עסק פוטנציאלי</p>
-              <Link
-                href="/assessment/new"
-                className="inline-flex items-center px-6 py-3 font-bold rounded-lg hover:opacity-90 transition-colors shadow-md border-2"
-                style={{ 
-                  backgroundColor: '#3b82f6', 
-                  color: 'white',
-                  borderColor: '#3b82f6',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-                }}
-              >
-                <FiPlus className="ml-2" size={18} />
-                צור הערכת עסק
-              </Link>
-            </div>
+                         <div className="bg-gradient-to-br from-white to-blue-50 rounded-xl border border-blue-100 p-8 text-center">
+               <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                 <FiFileText className="text-blue-500" size={24} />
+               </div>
+               <h3 className="text-xl font-medium text-gray-900 mb-2">אין הערכות עדיין</h3>
+               <p className="text-gray-600 mb-6">התחל ביצירת הערכת עסק חדשה כדי לנתח עסק פוטנציאלי</p>
+               {permissions.canCreateAssessment ? (
+                 <Link
+                   href="/assessment/new"
+                   className="inline-flex items-center px-6 py-3 font-bold rounded-lg hover:opacity-90 transition-colors shadow-md border-2"
+                   style={{ 
+                     backgroundColor: '#3b82f6', 
+                     color: 'white',
+                     borderColor: '#3b82f6',
+                     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                   }}
+                 >
+                   <FiPlus className="ml-2" size={18} />
+                   צור הערכת עסק
+                 </Link>
+               ) : (
+                 <div className="space-y-3">
+                                       <div className="text-sm text-gray-600">
+                      {permissions.subscription === 'חינם' 
+                        ? 'לא ניתן להעלות קבצים בחבילה חינמית'
+                        : 'השתמשת בכל ההערכות השנתיות שלך'
+                      }
+                    </div>
+                   <Link
+                     href="/pricing"
+                     className="inline-flex items-center px-6 py-3 font-bold rounded-lg hover:opacity-90 transition-colors shadow-md border-2"
+                     style={{ 
+                       backgroundColor: '#10b981', 
+                       color: 'white',
+                       borderColor: '#10b981',
+                       boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                     }}
+                   >
+                     שדרג חבילה
+                   </Link>
+                 </div>
+               )}
+             </div>
           )}
         </div>
       </div>

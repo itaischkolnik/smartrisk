@@ -66,21 +66,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
+        console.log('Auth state change:', event, currentSession?.user?.email);
         if (mounted) {
-          if (event === 'SIGNED_IN') {
-            setSession(currentSession);
-            setUser(currentSession?.user ?? null);
-            router.refresh();
-          } else if (event === 'SIGNED_OUT') {
-            setSession(null);
-            setUser(null);
-            router.refresh();
-            router.push('/');
-          } else if (event === 'TOKEN_REFRESHED') {
-            setSession(currentSession);
-            setUser(currentSession?.user ?? null);
-          }
-          setIsLoading(false);
+          // Debounce auth state changes to prevent rapid re-renders
+          // Use a longer debounce for SIGNED_IN events to prevent interference with form transitions
+          const debounceTime = event === 'SIGNED_IN' ? 1000 : 500;
+          setTimeout(() => {
+            if (!mounted) return;
+            
+            if (event === 'SIGNED_IN') {
+              setSession(currentSession);
+              setUser(currentSession?.user ?? null);
+              console.log('User signed in:', currentSession?.user?.email);
+              console.log('Current URL:', window.location.href);
+              // If we are on home page, send user to dashboard
+              if (typeof window !== 'undefined' && window.location.pathname === '/') {
+                router.push('/dashboard');
+              }
+            } else if (event === 'SIGNED_OUT') {
+              setSession(null);
+              setUser(null);
+              console.log('User signed out');
+              router.refresh();
+              router.push('/');
+            } else if (event === 'TOKEN_REFRESHED') {
+              setSession(currentSession);
+              setUser(currentSession?.user ?? null);
+              console.log('Token refreshed for:', currentSession?.user?.email);
+            } else if (event === 'INITIAL_SESSION') {
+              // Handle initial session loading
+              setSession(currentSession);
+              setUser(currentSession?.user ?? null);
+              console.log('Initial session loaded:', currentSession?.user?.email);
+            }
+            setIsLoading(false);
+          }, debounceTime);
         }
       }
     );
@@ -149,14 +169,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
+      console.log('Initiating Google sign-in...');
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Google sign-in error:', error);
+        throw error;
+      }
+      
+      console.log('Google sign-in initiated successfully');
     } catch (error) {
       console.error('Error signing in with Google:', error);
       throw error;

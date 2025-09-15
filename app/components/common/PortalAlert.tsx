@@ -64,6 +64,8 @@ const PortalAlert: React.FC<PortalAlertProps> = ({ isOpen, onClose, message, typ
     }
   };
 
+  const isSSR = typeof window === 'undefined';
+
   const alertContent = (
     <div 
       className="fixed inset-0 flex items-center justify-center"
@@ -102,8 +104,8 @@ const PortalAlert: React.FC<PortalAlertProps> = ({ isOpen, onClose, message, typ
             {children || (
               <button
                 onClick={onClose}
-                style={{ backgroundColor: '#4285F4' }}
-                className={`w-full ${getButtonStyle()} font-bold py-3 px-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 text-lg shadow-lg hover:cursor-pointer`}
+                style={{ backgroundColor: '#4285F4', cursor: 'pointer' }}
+                className={`w-full cursor-pointer ${getButtonStyle()} font-bold py-3 px-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 text-lg shadow-lg hover:cursor-pointer`}
               >
                 אישור
               </button>
@@ -114,7 +116,7 @@ const PortalAlert: React.FC<PortalAlertProps> = ({ isOpen, onClose, message, typ
     </div>
   );
 
-  if (!mounted || !isOpen) return null;
+  if (isSSR || !mounted || !isOpen) return null;
 
   // Create portal only on client side
   return createPortal(alertContent, document.body);

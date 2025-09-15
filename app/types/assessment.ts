@@ -54,7 +54,6 @@ export interface BusinessDetails {
 
 export interface FinancialData {
   asking_price: number;
-  annual_turnover: number;
   operating_profit: number;
   net_profit: number;
   roi: string;
@@ -82,7 +81,7 @@ export interface Assessment {
   id?: string;
   user_id: string;
   business_name?: string;
-  status: 'draft' | 'completed' | 'analyzed';
+  status: 'draft' | 'completed' | 'analyzed' | 'submitted_to_webhook';
   summary?: string;
   report_url?: string;
   created_at?: string;
@@ -117,7 +116,6 @@ export interface Assessment {
   sale_reason?: string;
   // Financial data
   asking_price?: number;
-  annual_revenue?: number;
   operating_profit?: number;
   net_profit?: number;
   roi?: number;

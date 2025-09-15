@@ -72,6 +72,25 @@ const PersonalDetailsForm: React.FC = () => {
           )}
         </div>
 
+        {/* Mobile Phone */}
+        <div className="col-span-2 md:col-span-1">
+          <label htmlFor="mobile_phone" className="block text-sm font-medium text-gray-700 mb-1">
+            טלפון נייד
+          </label>
+          <input
+            id="mobile_phone"
+            type="tel"
+            {...register('mobile_phone')}
+            className="block w-full rounded-md border border-blue-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-blue-50"
+            placeholder="050-1234567"
+          />
+          {errors.mobile_phone && (
+            <p className="mt-1 text-sm text-red-600">
+              {String(errors.mobile_phone.message)}
+            </p>
+          )}
+        </div>
+
         {/* Location */}
         <div className="col-span-2 md:col-span-1">
           <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">

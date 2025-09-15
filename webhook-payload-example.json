@@ -1,0 +1,158 @@
+{
+  "assessmentId": "14e14814-abcd-425b-b8b6-266c63350e7d",
+  "userId": "f8da364c-908b-4e8b-b78b-11e40a4a9edc",
+  "userEmail": "user@example.com",
+  "submissionDate": "2024-01-15T10:30:00.000Z",
+  "assessment": {
+    "personal_details": {
+      "full_name": "יוחנן דוגמא",
+      "age": "35",
+      "location": "תל אביב",
+      "marital_status": "נשוי",
+      "occupation": "יועץ עסקי",
+      "self_introduction": "תיאור אישי של המשתמש"
+    },
+    "personal_questionnaire": {
+      "life_experience": "ניסיון חיים רלוונטי",
+      "motivation": "המוטיבציה לעסק",
+      "financial_capability": "יכולת פיננסית",
+      "five_year_goals": "מטרות לחמש שנים"
+    },
+    "business_details": {
+      "business_name": "עסק דוגמא בע\"מ",
+      "business_type": "retail",
+      "business_structure": "limited_company",
+      "industry": "אופנה",
+      "establishment_date": "2019-01-15",
+      "employee_count": "10",
+      "business_location": "תל אביב רחוב הרצל 123",
+      "business_area": "100 מ\"ר",
+      "real_estate_availability": "נכס בבעלות",
+      "has_rental_property": "no",
+      "rental_end_date": "",
+      "has_renewal_option": "",
+      "renewal_duration": "",
+      "monthly_rent": "0",
+      "rental_deposit_cost": "0",
+      "operating_hours": "א-ה 9:00-18:00, ו 9:00-14:00",
+      "owner_phone": "050-1234567",
+      "licenses_permits": ["business_license", "health_permit"],
+      "other_license_details": "רישיון עסק ורישיון מזון",
+      "seller_offers_support": "yes",
+      "support_duration": "3 חודשים",
+      "can_be_relocated": "no",
+      "is_franchise": "no",
+      "property_details": "פרטי הנכס",
+      "sale_reason": "סיבת המכירה",
+      "legal_issues": "בעיות משפטיות אם קיימות",
+      "additional_notes": "הערות נוספות"
+    },
+    "financial_data": {
+      "asking_price": "1000000",
+      "is_inventory_included_in_price": "yes",
+      "inventory_value_in_price": "200000",
+      "operating_profit": "150000",
+      "net_profit": "100000",
+      "inventory_value": "200000",
+      "equipment_value": "300000",
+      "monthly_salary_expenses": "50000",
+      "monthly_expenses": "30000",
+      "additional_payment_details": "מזומן",
+      "are_all_debts_paid": "yes",
+      "debt_details": "",
+      "has_legal_claims": "no",
+      "legal_claims_details": "",
+      "payment_terms": "מזומן",
+      "financial_notes": "הערות כלליות"
+    },
+    "swot_analysis": {
+      "strengths": "החוזקות של העסק",
+      "weaknesses": "החולשות של העסק",
+      "opportunities": "הזדמנויות בשוק",
+      "threats": "איומים חיצוניים"
+    },
+    "additional_files": {},
+    "documents": {}
+  },
+  "files": [
+    {
+      "id": "4670f0a1-4fb9-49d4-b5d0-946121f5fac9",
+      "name": "רווח-והפסד-3-שנים-02.jpg",
+      "type": "image/jpeg",
+      "size": 102395,
+      "category": "general",
+      "url": "https://qjcbwzxptrzforxlpcid.supabase.co/storage/v1/object/public/assessment-files/f8da364c-908b-4e8b-b78b-11e40a4a9edc/14e14814-abcd-425b-b8b6-266c63350e7d/1750581240886_____-_____-3-____-02.jpg",
+      "created_at": "2024-01-15T10:25:00.000Z"
+    },
+    {
+      "id": "1cd81cba-d65c-4052-8b21-acbeded706e7",
+      "name": "רווח והפסד 2024.pdf",
+      "type": "application/pdf",
+      "size": 177777,
+      "category": "general",
+      "url": "https://qjcbwzxptrzforxlpcid.supabase.co/storage/v1/object/public/assessment-files/f8da364c-908b-4e8b-b78b-11e40a4a9edc/14e14814-abcd-425b-b8b6-266c63350e7d/1751808366757____________2024.pdf",
+      "created_at": "2024-01-15T10:26:00.000Z"
+    },
+    {
+      "id": "3d37000a-25a6-4cb9-bedd-cd7c7da33985",
+      "name": "רווח והפסד 2023.pdf",
+      "type": "application/pdf",
+      "size": 176943,
+      "category": "general",
+      "url": "https://qjcbwzxptrzforxlpcid.supabase.co/storage/v1/object/public/assessment-files/f8da364c-908b-4e8b-b78b-11e40a4a9edc/14e14814-abcd-425b-b8b6-266c63350e7d/1751808368143____________2023.pdf",
+      "created_at": "2024-01-15T10:27:00.000Z"
+    }
+  ],
+  "totalFiles": 3,
+  "fileAnalysis": {
+    "totalAnalyzed": 3,
+    "successfulAnalyses": 2,
+    "results": [
+      {
+        "fileName": "רווח-והפסד-3-שנים-02.jpg",
+        "fileId": "4670f0a1-4fb9-49d4-b5d0-946121f5fac9",
+        "analysisSuccess": true,
+        "financialData": {
+          "שנה": 2023,
+          "הכנסות": 1250000.00,
+          "הכנסות נוספות": 15000.00,
+          "רווח העסק": 295000.00,
+          "משכורות בעלים": 80000.00,
+          "רווח כולל": 375000.00,
+          "עלות המכר": 400000.00,
+          "הוצאות מנהליות": 200000.00,
+          "משכורות עובדים": 350000.00
+        }
+      },
+      {
+        "fileName": "רווח והפסד 2024.pdf",
+        "fileId": "1cd81cba-d65c-4052-8b21-acbeded706e7",
+        "analysisSuccess": true,
+        "financialData": {
+          "שנה": 2024,
+          "הכנסות": 1450000.00,
+          "הכנסות נוספות": 22000.00,
+          "רווח העסק": 385000.00,
+          "משכורות בעלים": 90000.00,
+          "רווח כולל": 475000.00,
+          "עלות המכר": 480000.00,
+          "הוצאות מנהליות": 220000.00,
+          "משכורות עובדים": 387000.00
+        }
+      },
+      {
+        "fileName": "רווח והפסד 2023.pdf",
+        "fileId": "3d37000a-25a6-4cb9-bedd-cd7c7da33985",
+        "analysisSuccess": false,
+        "error": "File format not supported for text extraction"
+      }
+    ]
+  },
+  "metadata": {
+    "source": "SmartRisk Assessment Form",
+    "version": "1.0",
+    "timestamp": "2024-01-15T10:30:00.000Z",
+    "sectionsCount": 7,
+    "hasFileAnalysis": true
+  }
+} 

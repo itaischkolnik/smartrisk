@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useFormContext } from 'react-hook-form';
-import { FiUpload, FiFile, FiTrash, FiDownload } from 'react-icons/fi';
+import { FiUpload, FiFile, FiTrash, FiDownload, FiRefreshCw, FiCheck } from 'react-icons/fi';
 
 interface UploadedFile {
   id: string;
@@ -14,53 +14,144 @@ interface UploadedFile {
   created_at: string;
 }
 
+interface SpecificFiles {
+  profit_loss_year_a: UploadedFile | null;
+  profit_loss_year_b: UploadedFile | null;
+  profit_loss_year_c: UploadedFile | null;
+  form_11: UploadedFile | null;
+  form_126: UploadedFile | null;
+}
+
 const FileUploadForm: React.FC<{ assessmentId?: string }> = ({ assessmentId }) => {
   const { setValue, watch } = useFormContext();
-  const [dragActive, setDragActive] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState<string | null>(null); // Track which field is uploading
+  const [specificFiles, setSpecificFiles] = useState<SpecificFiles>({
+    profit_loss_year_a: null,
+    profit_loss_year_b: null,
+    profit_loss_year_c: null,
+    form_11: null,
+    form_126: null,
+  });
+  const [loading, setLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isMounted, setIsMounted] = useState(true);
 
-  // Load previously uploaded files
-  useEffect(() => {
-    const loadUploadedFiles = async () => {
-      if (assessmentId) {
-        try {
-          const response = await fetch(`/api/assessment/${assessmentId}/files`);
-          if (response.ok) {
-            const data = await response.json();
-            setUploadedFiles(data.files || []);
-          }
-        } catch (error) {
-          console.error('Error loading uploaded files:', error);
+  // File input refs for each specific field
+  const fileInputRefs = {
+    profit_loss_year_a: useRef<HTMLInputElement>(null),
+    profit_loss_year_b: useRef<HTMLInputElement>(null),
+    profit_loss_year_c: useRef<HTMLInputElement>(null),
+    form_11: useRef<HTMLInputElement>(null),
+    form_126: useRef<HTMLInputElement>(null),
+  };
+
+  // Load previously uploaded files and categorize them
+  const loadUploadedFiles = async () => {
+    if (assessmentId) {
+      try {
+        setLoading(true);
+        console.log('Loading files for assessment:', assessmentId);
+        const response = await fetch(`/api/assessment/${assessmentId}/files`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          const files = data.files || [];
+          
+          // Categorize files based on their category
+          const categorizedFiles: SpecificFiles = {
+            profit_loss_year_a: files.find((f: UploadedFile) => f.file_category === 'profit_loss_year_a') || null,
+            profit_loss_year_b: files.find((f: UploadedFile) => f.file_category === 'profit_loss_year_b') || null,
+            profit_loss_year_c: files.find((f: UploadedFile) => f.file_category === 'profit_loss_year_c') || null,
+            form_11: files.find((f: UploadedFile) => f.file_category === 'form_11') || null,
+            form_126: files.find((f: UploadedFile) => f.file_category === 'form_126') || null,
+          };
+          
+          setSpecificFiles(categorizedFiles);
+          console.log('Categorized files:', categorizedFiles);
+        } else {
+          console.error('Failed to load files:', response.status);
         }
+      } catch (error) {
+        console.error('Error loading uploaded files:', error);
+      } finally {
+        setLoading(false);
       }
-    };
-
-    loadUploadedFiles();
-  }, [assessmentId]);
-
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
     }
   };
 
-  const uploadFile = async (file: File) => {
-    if (!assessmentId) return;
+  useEffect(() => {
+    setIsMounted(true);
+    let timeoutId: NodeJS.Timeout;
+    
+    if (assessmentId) {
+      const loadFiles = async () => {
+        try {
+          setLoading(true);
+          console.log('Loading files for assessment:', assessmentId);
+          const response = await fetch(`/api/assessment/${assessmentId}/files`);
+          
+          if (!isMounted) return; // Check if component is still mounted
+          
+          if (response.ok) {
+            const data = await response.json();
+            const files = data.files || [];
+            
+            // Categorize files based on their category
+            const categorizedFiles: SpecificFiles = {
+              profit_loss_year_a: files.find((f: UploadedFile) => f.file_category === 'profit_loss_year_a') || null,
+              profit_loss_year_b: files.find((f: UploadedFile) => f.file_category === 'profit_loss_year_b') || null,
+              profit_loss_year_c: files.find((f: UploadedFile) => f.file_category === 'profit_loss_year_c') || null,
+              form_11: files.find((f: UploadedFile) => f.file_category === 'form_11') || null,
+              form_126: files.find((f: UploadedFile) => f.file_category === 'form_126') || null,
+            };
+            
+            if (isMounted) {
+              setSpecificFiles(categorizedFiles);
+              console.log('Categorized files:', categorizedFiles);
+            }
+          } else {
+            console.error('Failed to load files:', response.status);
+          }
+        } catch (error) {
+          console.error('Error loading uploaded files:', error);
+        } finally {
+          if (isMounted) {
+            setLoading(false);
+          }
+        }
+      };
+      
+      // Add a small delay to prevent rapid loading during transitions
+      timeoutId = setTimeout(() => {
+        loadFiles();
+      }, 100);
+    }
+    
+    return () => {
+      setIsMounted(false);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [assessmentId]);
+
+  // Cleanup effect to ensure proper unmounting
+  useEffect(() => {
+    return () => {
+      setIsMounted(false);
+    };
+  }, []);
+
+  const uploadFile = async (file: File, category: keyof SpecificFiles) => {
+    if (!assessmentId || !isMounted) return;
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('category', 'general'); // You can make this dynamic if needed
+    formData.append('category', category);
 
     try {
+      setUploading(category);
+      
       const response = await fetch(`/api/assessment/${assessmentId}/files`, {
         method: 'POST',
         body: formData,
@@ -71,157 +162,271 @@ const FileUploadForm: React.FC<{ assessmentId?: string }> = ({ assessmentId }) =
       }
 
       const data = await response.json();
-      if (data.success && data.file) {
-        setUploadedFiles(prev => [...prev, data.file]);
-        setSelectedFiles(prev => prev.filter(f => f.name !== file.name));
-        setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
+      if (data.success && data.file && isMounted) {
+        // Update the specific file in state
+        setSpecificFiles(prev => ({
+          ...prev,
+          [category]: data.file
+        }));
+        console.log(`Successfully uploaded ${category}:`, data.file);
       }
     } catch (error) {
       console.error('Error uploading file:', error);
-      setUploadProgress(prev => ({ ...prev, [file.name]: -1 })); // -1 indicates error
+      if (isMounted) {
+        alert('שגיאה בהעלאת הקובץ. אנא נסה שוב.');
+      }
+    } finally {
+      // Only update state if component is still mounted
+      if (isMounted) {
+        setTimeout(() => {
+          if (isMounted) {
+            setUploading(null);
+          }
+        }, 0);
+      }
     }
   };
 
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, category: keyof SpecificFiles) => {
+    const file = e.target.files?.[0];
+    if (!file || !isMounted) return;
+
+    // Validate file type - only PDF files are accepted
+    if (file.type !== 'application/pdf') {
+      if (isMounted) {
+        alert('יש להעלות רק קבצי PDF');
+      }
+      return;
+    }
+
+    await uploadFile(file, category);
     
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const newFiles = Array.from(e.dataTransfer.files);
-      setSelectedFiles(prev => [...prev, ...newFiles]);
-      
-      // Start uploading the dropped files
-      setUploading(true);
-      for (const file of newFiles) {
-        await uploadFile(file);
-      }
-      setUploading(false);
-    }
+    // Clear the input only if component is still mounted
+    
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const newFiles = Array.from(e.target.files);
-      setSelectedFiles(prev => [...prev, ...newFiles]);
-      
-      // Start uploading the selected files
-      setUploading(true);
-      for (const file of newFiles) {
-        await uploadFile(file);
-      }
-      setUploading(false);
+  const deleteFile = async (category: keyof SpecificFiles, event?: React.MouseEvent) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
     }
-  };
-
-  const deleteUploadedFile = async (fileId: string) => {
-    if (!assessmentId) return;
+    
+    const file = specificFiles[category];
+    if (!file || !assessmentId || isDeleting || !isMounted) return;
 
     try {
-      const response = await fetch(`/api/assessment/${assessmentId}/files/${fileId}`, {
+      setIsDeleting(true);
+      console.log('Deleting file with ID:', file.id);
+      
+      const response = await fetch(`/api/assessment/${assessmentId}/files/${file.id}`, {
         method: 'DELETE',
       });
 
-      if (response.ok) {
-        setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
+      const result = await response.json();
+
+      if (response.ok && result.success && isMounted) {
+        // Remove from local state
+        setSpecificFiles(prev => ({
+          ...prev,
+          [category]: null
+        }));
+        console.log('File deleted successfully');
+      } else if (isMounted) {
+        console.error('Delete failed:', result.error);
+        alert(`שגיאה במחיקת הקובץ: ${result.error || 'שגיאה לא ידועה'}`);
       }
     } catch (error) {
       console.error('Error deleting file:', error);
+      if (isMounted) {
+        alert('אירעה שגיאה במחיקת הקובץ. אנא נסה שוב.');
+      }
+    } finally {
+      // Only update state if component is still mounted
+      if (isMounted) {
+        setTimeout(() => {
+          if (isMounted) {
+            setIsDeleting(false);
+          }
+        }, 0);
+      }
     }
   };
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">העלאת מסמכים</h2>
-        <p className="mt-1 text-sm text-gray-600">
-          העלה מסמכים התומכים בניתוח העסק, כגון דוחות כספיים, מסמכי בעלות, הסכמים, וכו'
-        </p>
-      </div>
-      
-      <div 
-        className={`border-2 border-dashed rounded-lg p-8 text-center ${
-          dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
-        }`}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-      >
-        <div className="space-y-4">
-          <FiUpload className="mx-auto h-12 w-12 text-gray-400" />
-          <div className="flex text-sm text-gray-600">
-            <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
-              <span>העלאת קבצים</span>
-              <input
-                ref={fileInputRef}
-                id="file-upload"
-                name="documents"
-                type="file"
-                className="sr-only"
-                multiple
-                onChange={handleFileChange}
-                disabled={uploading}
-              />
-            </label>
-            <p className="pr-1">או גרור ושחרר</p>
+  const FileUploadField: React.FC<{
+    category: keyof SpecificFiles;
+    title: string;
+    description: string;
+    acceptedTypes?: string;
+    yearLabel?: string;
+  }> = ({ category, title, description, acceptedTypes = "application/pdf", yearLabel }) => {
+    const file = specificFiles[category];
+    const isUploading = uploading === category;
+
+    return (
+      <div className="border border-gray-200 rounded-lg p-6" key={category}>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 flex items-center">
+              {file ? (
+                <FiCheck className="h-5 w-5 text-green-500 ml-2" />
+              ) : (
+                <div className="h-5 w-5 border-2 border-gray-300 rounded ml-2"></div>
+              )}
+              {title}
+              {yearLabel && (
+                <span className="mr-2 px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded-md">
+                  {yearLabel}
+                </span>
+              )}
+            </h3>
+            <p className="text-sm text-gray-600 mt-1">{description}</p>
           </div>
-          <p className="text-xs text-gray-500">
-            PNG, JPG, PDF, DOC, XLS עד 10MB
-          </p>
         </div>
-      </div>
-      
-      <div className="mt-4">
-        <h3 className="text-lg font-medium text-gray-900">קבצים שהועלו</h3>
-        <ul className="mt-3 divide-y divide-gray-200 border border-gray-200 rounded-md">
-          {uploadedFiles.map((file) => (
-            <li key={file.id} className="pr-3 pl-4 py-3 flex items-center justify-between text-sm">
+
+        <div className="min-h-[120px]">
+          {file ? (
+            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
               <div className="flex items-center">
-                <FiFile className="flex-shrink-0 h-5 w-5 text-gray-400" />
-                <span className="mr-2 flex-1 w-0 truncate">{file.file_name}</span>
+                <FiFile className="h-5 w-5 text-green-600 ml-2" />
+                <span className="text-sm font-medium text-green-800">{file.file_name}</span>
+                <span className="text-xs text-green-600 mr-2">({Math.round(file.file_size / 1024)} KB)</span>
               </div>
-              <div className="flex items-center space-x-4">
-                <span className="text-gray-500">{Math.round(file.file_size / 1024)} KB</span>
+              <div className="flex items-center space-x-2">
                 <a
                   href={file.file_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-500"
+                  className="text-green-600 hover:text-green-500"
+                  title="הורד קובץ"
                 >
-                  <FiDownload />
+                  <FiDownload className="h-4 w-4" />
                 </a>
                 <button
                   type="button"
-                  className="text-red-600 hover:text-red-500"
-                  onClick={() => deleteUploadedFile(file.id)}
-                  disabled={uploading}
+                  onClick={(e) => deleteFile(category, e)}
+                  disabled={isDeleting}
+                  className="text-red-600 hover:text-red-500 disabled:opacity-50"
+                  title="מחק קובץ"
                 >
-                  <FiTrash />
+                  {isDeleting ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                  ) : (
+                    <FiTrash className="h-4 w-4" />
+                  )}
                 </button>
               </div>
-            </li>
-          ))}
-          {selectedFiles.map((file: File, index: number) => (
-            <li key={`new-${index}`} className="pr-3 pl-4 py-3 flex items-center justify-between text-sm">
-              <div className="flex items-center">
-                <FiFile className="flex-shrink-0 h-5 w-5 text-gray-400" />
-                <span className="mr-2 flex-1 w-0 truncate">{file.name}</span>
-              </div>
-              <div className="flex space-x-4">
-                <span className="text-gray-500">{Math.round(file.size / 1024)} KB</span>
-                {uploadProgress[file.name] === -1 ? (
-                  <span className="text-red-500">Upload failed</span>
-                ) : uploadProgress[file.name] ? (
-                  <span className="text-gray-500">{uploadProgress[file.name]}%</span>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ul>
+            </div>
+          ) : (
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+              <input
+                ref={fileInputRefs[category]}
+                type="file"
+                accept={acceptedTypes}
+                onChange={(e) => handleFileChange(e, category)}
+                disabled={isUploading}
+                className="sr-only"
+                id={`file-${category}`}
+              />
+              <label
+                htmlFor={`file-${category}`}
+                className="cursor-pointer flex flex-col items-center"
+              >
+                {isUploading ? (
+                  <div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+                    <span className="text-sm text-gray-600">מעלה קובץ...</span>
+                  </div>
+                ) : (
+                  <div>
+                    <FiUpload className="h-8 w-8 text-gray-400 mb-2" />
+                    <span className="text-sm font-medium text-blue-600 hover:text-blue-500">
+                      לחץ להעלאת קובץ
+                    </span>
+                    <span className="text-xs text-gray-500 mt-1">
+                      קבצי PDF בלבד
+                    </span>
+                  </div>
+                )}
+              </label>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  try {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">העלאת מסמכים נדרשים</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            אנא העלה את המסמכים הבאים לצורך ניתוח מדויק של העסק. כל מסמך יש להעלות בשדה המתאים לו.
+          </p>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-sm text-blue-800">
+            <strong>חשוב:</strong> העלאת המסמכים אינה חובה. ניתן לשלוח את הטופס גם ללא קבצים מצורפים.
+            המסמכים יעזרו לקבל ניתוח מדויק יותר של העסק.
+          </p>
+        </div>
+
+        <div className="space-y-6" key="file-upload-fields">
+          <FileUploadField
+            category="profit_loss_year_a"
+            title="דוח רווח והפסד - שנה א' (השנה האחרונה)"
+            description="דוח רווח והפסד של השנה האחרונה - קובץ PDF בלבד"
+            yearLabel="שנה א'"
+          />
+
+          <FileUploadField
+            category="profit_loss_year_b"
+            title="דוח רווח והפסד - שנה ב' (שנה לפני האחרונה)"
+            description="דוח רווח והפסד של השנה שלפני האחרונה - קובץ PDF בלבד"
+            yearLabel="שנה ב'"
+          />
+
+          <FileUploadField
+            category="profit_loss_year_c"
+            title="דוח רווח והפסד - שנה ג' (שנתיים לפני האחרונה)"
+            description="דוח רווח והפסד של שנתיים לפני האחרונה - קובץ PDF בלבד"
+            yearLabel="שנה ג'"
+          />
+
+          <FileUploadField
+            category="form_11"
+            title="טופס י״א (טופס פחת)"
+            description="טופס פחת של העסק - קובץ PDF בלבד"
+          />
+
+          <FileUploadField
+            category="form_126"
+            title="טופס 126 (תמחיר משכורות)"
+            description="מסמך תמחיר משכורות - קובץ PDF בלבד"
+          />
+        </div>
+
+        {loading && (
+          <div key="loading-files" className="flex justify-center items-center py-4">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <span className="mr-2 text-gray-600">טוען קבצים...</span>
+          </div>
+        )}
+      </div>
+    );
+  } catch (error) {
+    console.error('Error rendering FileUploadForm:', error);
+    return (
+      <div className="space-y-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-800">
+            אירעה שגיאה בטעינת טופס העלאת הקבצים. אנא רענן את העמוד ונסה שוב.
+          </p>
+        </div>
+      </div>
+    );
+  }
 };
 
 export default FileUploadForm; 

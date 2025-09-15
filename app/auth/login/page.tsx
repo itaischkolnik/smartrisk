@@ -37,8 +37,23 @@ const LoginPage = () => {
       }
 
       if (data?.user) {
-        // Login successful
-        router.push(redirect);
+        // Login successful - write secure cookies on the server so middleware can read them
+        if (data.session) {
+          try {
+            await fetch('/api/auth/set-session', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                access_token: data.session.access_token,
+                refresh_token: data.session.refresh_token,
+              }),
+            });
+          } catch (err) {
+            console.error('Failed to persist session cookies:', err);
+          }
+        }
+        window.location.href = redirect;
       } else {
         setError('פרטי ההתחברות שגויים');
       }

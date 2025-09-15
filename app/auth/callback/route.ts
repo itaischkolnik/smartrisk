@@ -2,7 +2,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-export const runtime = 'edge';
+// Use default (Node.js) runtime so that we can set http-only cookies properly
 
 export async function GET(request: Request) {
   try {
@@ -25,6 +25,16 @@ export async function GET(request: Request) {
     // Exchange the code for a session
     const supabase = createRouteHandlerClient({ cookies });
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    // Explicitly set cookies again to be safe (some environments drop them on exchange)
+    if (data.session) {
+      const { error: setErr } = await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+      if (setErr) {
+        console.error('setSession error:', setErr.message);
+      }
+    }
     
     if (error) {
       console.error('Session exchange error:', error);
@@ -36,20 +46,19 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL('/auth/login', siteUrl));
     }
 
-    console.log('Authentication successful, redirecting to dashboard');
+    console.log('Authentication successful, user:', data.session.user.email);
+    console.log('Redirecting to dashboard');
     
-    // After successful authentication, redirect to dashboard
-    const response = NextResponse.redirect(new URL('/dashboard', siteUrl));
+    // After successful authentication, redirect to dashboard with auth callback indicator
+    const dashboardUrl = new URL('/dashboard', siteUrl);
+    dashboardUrl.searchParams.set('auth_callback', 'true');
     
-    // Ensure cookies are being set
-    const cookieStore = cookies();
-    response.cookies.set({
-      name: 'sb-access-token',
-      value: data.session.access_token,
-      path: '/',
-      secure: true,
-      sameSite: 'lax'
-    });
+    const response = NextResponse.redirect(dashboardUrl);
+    
+    // Add headers to ensure session is established
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
     
     return response;
   } catch (error) {
