@@ -2,16 +2,14 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { FiMenu, FiX, FiHome, FiFileText, FiSettings, FiHelpCircle, FiLogOut } from 'react-icons/fi';
+import { FiMenu, FiX, FiHome, FiSettings, FiLogOut } from 'react-icons/fi';
 import { useAuth } from '../../contexts/AuthContext';
 import { RiListSettingsLine } from "react-icons/ri";
 
 // Navigation items for the sidebar
 const navItems = [
   { name: 'לוח בקרה', href: '/dashboard', icon: FiHome },
-  { name: 'הערכות', href: '/assessments', icon: FiFileText },
   { name: 'הגדרות', href: '/settings', icon: FiSettings },
-  { name: 'עזרה', href: '/help', icon: FiHelpCircle },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

@@ -6,11 +6,28 @@ const nextConfig = {
   images: {
     domains: ['avatars.githubusercontent.com', 'lh3.googleusercontent.com'],
   },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     if (!config.externals) {
       config.externals = [];
     }
     config.externals.push('puppeteer');
+
+    // Handle Node.js modules for pdf-parse
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        http: false,
+        https: false,
+        url: false,
+        path: false,
+        stream: false,
+        crypto: false,
+        buffer: false,
+        util: false,
+        zlib: false,
+      };
+    }
 
     config.module.rules.push({
       test: /\.map$/,

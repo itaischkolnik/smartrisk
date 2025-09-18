@@ -4,7 +4,7 @@ import { sendConsultationEmail } from '../../services/email';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fullName, mobile, email, assessmentScore, assessmentResult } = body;
+    const { fullName, mobile, email, assessmentScore, assessmentResult, questionnaireAnswers, questions } = body;
 
     // Validate required fields
     if (!fullName || !mobile || !email) {
@@ -29,7 +29,9 @@ export async function POST(request: NextRequest) {
       mobile,
       email,
       assessmentScore,
-      assessmentResult
+      assessmentResult,
+      questionnaireAnswers,
+      questions
     });
 
     if (result.success) {

@@ -12,6 +12,8 @@ interface UploadedFile {
   file_type: string;
   file_category: string;
   created_at: string;
+  analysis_confidence?: number;
+  analysis_warnings?: string[];
 }
 
 interface SpecificFiles {
@@ -285,36 +287,75 @@ const FileUploadForm: React.FC<{ assessmentId?: string }> = ({ assessmentId }) =
 
         <div className="min-h-[120px]">
           {file ? (
-            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
-              <div className="flex items-center">
-                <FiFile className="h-5 w-5 text-green-600 ml-2" />
-                <span className="text-sm font-medium text-green-800">{file.file_name}</span>
-                <span className="text-xs text-green-600 mr-2">({Math.round(file.file_size / 1024)} KB)</span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
+                <div className="flex items-center">
+                  <FiFile className="h-5 w-5 text-green-600 ml-2" />
+                  <span className="text-sm font-medium text-green-800">{file.file_name}</span>
+                  <span className="text-xs text-green-600 mr-2">({Math.round(file.file_size / 1024)} KB)</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <a
+                    href={file.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-600 hover:text-green-500"
+                    title="הורד קובץ"
+                  >
+                    <FiDownload className="h-4 w-4" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={(e) => deleteFile(category, e)}
+                    disabled={isDeleting}
+                    className="text-red-600 hover:text-red-500 disabled:opacity-50"
+                    title="מחק קובץ"
+                  >
+                    {isDeleting ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                    ) : (
+                      <FiTrash className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <a
-                  href={file.file_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-green-600 hover:text-green-500"
-                  title="הורד קובץ"
-                >
-                  <FiDownload className="h-4 w-4" />
-                </a>
-                <button
-                  type="button"
-                  onClick={(e) => deleteFile(category, e)}
-                  disabled={isDeleting}
-                  className="text-red-600 hover:text-red-500 disabled:opacity-50"
-                  title="מחק קובץ"
-                >
-                  {isDeleting ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
-                  ) : (
-                    <FiTrash className="h-4 w-4" />
+              
+              {/* Analysis confidence indicator */}
+              {file.analysis_confidence !== undefined && (
+                <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-blue-800">רמת דיוק הניתוח:</span>
+                    <span className={`text-xs font-bold ${
+                      file.analysis_confidence >= 80 ? 'text-green-600' :
+                      file.analysis_confidence >= 60 ? 'text-yellow-600' : 'text-red-600'
+                    }`}>
+                      {file.analysis_confidence}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div 
+                      className={`h-1.5 rounded-full ${
+                        file.analysis_confidence >= 80 ? 'bg-green-500' :
+                        file.analysis_confidence >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${file.analysis_confidence}%` }}
+                    ></div>
+                  </div>
+                  {file.analysis_warnings && file.analysis_warnings.length > 0 && (
+                    <div className="mt-2">
+                      <span className="text-xs text-orange-700 font-medium">אזהרות:</span>
+                      <ul className="text-xs text-orange-600 mt-1">
+                        {file.analysis_warnings.map((warning, idx) => (
+                          <li key={idx} className="flex items-start">
+                            <span className="mr-1">•</span>
+                            <span>{warning}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
-                </button>
-              </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">

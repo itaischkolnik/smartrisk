@@ -168,7 +168,9 @@ const BusinessSaleReadiness = () => {
         body: JSON.stringify({
           ...contactFormData,
           assessmentScore: analysis?.overall_score || 0,
-          assessmentResult: analysis?.verbal_assessment || ''
+          assessmentResult: analysis?.verbal_assessment || '',
+          questionnaireAnswers: formData,
+          questions: questions
         }),
       });
 

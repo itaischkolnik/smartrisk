@@ -4,8 +4,8 @@ import { generateBusinessAnalysis } from '@/services/openai';
 import { sendEmail } from '@/services/email';
 import { auth } from '@/lib/supabase/auth';
 
-// Configure runtime
-export const runtime = 'edge';
+// Configure runtime - using nodejs to support pdf-parse
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {

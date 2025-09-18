@@ -75,7 +75,7 @@ const PersonalDetailsForm: React.FC = () => {
         {/* Mobile Phone */}
         <div className="col-span-2 md:col-span-1">
           <label htmlFor="mobile_phone" className="block text-sm font-medium text-gray-700 mb-1">
-            טלפון נייד
+            טלפון נייד<span className="text-red-500">*</span>
           </label>
           <input
             id="mobile_phone"

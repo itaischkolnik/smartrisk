@@ -32,7 +32,7 @@ const validationSchema = z.object({
   age: z.string().min(1, { message: 'נדרש גיל' }),
   location: z.string().optional(),
   marital_status: z.string().optional(),
-  mobile_phone: z.string().optional(),
+  mobile_phone: z.string().min(1, { message: 'נדרש מספר טלפון נייד' }),
   occupation: z.string().optional(),
   self_introduction: z.string().optional(),
   
@@ -177,7 +177,7 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
     window.addEventListener('error', handleError);
     return () => window.removeEventListener('error', handleError);
   }, []);
-  
+
   const methods = useForm<FormValues>({
     resolver: zodResolver(validationSchema),
     defaultValues: {
@@ -205,6 +205,120 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
       average_owner_salary: undefined,
     },
   });
+
+  // Handle page visibility changes to save data when user switches apps
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // User switched away from the page, save current form data
+        const currentData = methods.getValues();
+        const cleanedData = cleanFormData(currentData);
+        saveToLocalStorage(cleanedData);
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      // Save data before page unload
+      const currentData = methods.getValues();
+      const cleanedData = cleanFormData(currentData);
+      saveToLocalStorage(cleanedData);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [methods]);
+
+  // Generate a unique key for localStorage based on user and assessment
+  const getStorageKey = () => {
+    if (currentAssessmentId) {
+      return `assessment_draft_${currentAssessmentId}`;
+    }
+    return user ? `assessment_draft_new_${user.id}` : 'assessment_draft_anonymous';
+  };
+
+  // Clean form data to ensure proper types
+  const cleanFormData = (data: any): Partial<FormValues> => {
+    const cleanedData = { ...data };
+    if (cleanedData.licenses_permits && Array.isArray(cleanedData.licenses_permits)) {
+      cleanedData.licenses_permits = cleanedData.licenses_permits.filter((item: any): item is string => item !== undefined);
+    }
+    return cleanedData;
+  };
+
+  // Save form data to localStorage
+  const saveToLocalStorage = (data: Partial<FormValues>) => {
+    try {
+      const storageKey = getStorageKey();
+      const dataToSave = {
+        ...data,
+        currentStep,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(storageKey, JSON.stringify(dataToSave));
+    } catch (error) {
+      console.warn('Failed to save form data to localStorage:', error);
+    }
+  };
+
+  // Load form data from localStorage
+  const loadFromLocalStorage = (): { data: Partial<FormValues>; step: number } | null => {
+    try {
+      const storageKey = getStorageKey();
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Only use localStorage data if it's less than 24 hours old
+        const isRecent = Date.now() - (parsed.timestamp || 0) < 24 * 60 * 60 * 1000;
+        if (isRecent) {
+          const { currentStep: savedStep, timestamp, ...formData } = parsed;
+          return { data: formData, step: savedStep || 0 };
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load form data from localStorage:', error);
+    }
+    return null;
+  };
+
+  // Clear localStorage data
+  const clearLocalStorage = () => {
+    try {
+      const storageKey = getStorageKey();
+      localStorage.removeItem(storageKey);
+    } catch (error) {
+      console.warn('Failed to clear localStorage:', error);
+    }
+  };
+
+  // Auto-save form data to localStorage on form changes
+  useEffect(() => {
+    const subscription = methods.watch((data) => {
+      // Only save if we have some meaningful data
+      const hasData = Object.values(data).some(value => 
+        value !== '' && value !== undefined && value !== null && 
+        (Array.isArray(value) ? value.length > 0 : true)
+      );
+      
+      if (hasData) {
+        const cleanedData = cleanFormData(data);
+        saveToLocalStorage(cleanedData);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [methods, currentStep, currentAssessmentId, user]);
+
+  // Save current step to localStorage when it changes
+  useEffect(() => {
+    const currentData = methods.getValues();
+    const cleanedData = cleanFormData(currentData);
+    saveToLocalStorage(cleanedData);
+  }, [currentStep, methods]);
   
   // Load saved assessment data
   useEffect(() => {
@@ -311,6 +425,23 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
               }
             });
 
+            // Check for more recent localStorage data
+            const localData = loadFromLocalStorage();
+            if (localData && localData.data) {
+              // Merge localStorage data with database data, prioritizing localStorage for non-empty values
+              Object.keys(localData.data).forEach(key => {
+                const localValue = localData.data[key as keyof FormValues];
+                if (localValue !== '' && localValue !== undefined && localValue !== null) {
+                  (formData as any)[key] = localValue;
+                }
+              });
+              
+              // Also restore the step if available
+              if (localData.step !== undefined) {
+                setCurrentStep(localData.step);
+              }
+            }
+
             // Set form data
             methods.reset(formData);
           }
@@ -324,36 +455,50 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
         // Load user profile data for new assessment
         try {
           setIsLoading(true);
-          const supabase = createClientComponentClient();
           
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
+          // First check localStorage for unsaved data
+          const localData = loadFromLocalStorage();
+          let formData: Partial<FormValues> = {};
+          
+          if (localData && localData.data) {
+            // Use localStorage data if available
+            formData = localData.data;
+            if (localData.step !== undefined) {
+              setCurrentStep(localData.step);
+            }
+          } else {
+            // Otherwise load from profile
+            const supabase = createClientComponentClient();
+            
+            const { data: profile, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
 
-          if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
-            console.error('Error loading profile:', error);
+            if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+              console.error('Error loading profile:', error);
+            }
+
+            if (profile) {
+              // Auto-populate personal details from profile
+              formData = {
+                full_name: profile.full_name || '',
+                age: profile.age?.toString() || '',
+                location: profile.location || '',
+                marital_status: profile.marital_status || '',
+                mobile_phone: profile.mobile_phone || '',
+                occupation: profile.occupation || '',
+                self_introduction: profile.self_introduction || '',
+                life_experience: profile.life_experience || '',
+                motivation: profile.motivation || '',
+                financial_capability: profile.financial_capability || '',
+                five_year_goals: profile.five_year_goals || '',
+              };
+            }
           }
 
-          if (profile) {
-            // Auto-populate personal details from profile
-            const formData: Partial<FormValues> = {
-              full_name: profile.full_name || '',
-              age: profile.age?.toString() || '',
-              location: profile.location || '',
-              marital_status: profile.marital_status || '',
-              mobile_phone: profile.mobile_phone || '',
-              occupation: profile.occupation || '',
-              self_introduction: profile.self_introduction || '',
-              life_experience: profile.life_experience || '',
-              motivation: profile.motivation || '',
-              financial_capability: profile.financial_capability || '',
-              five_year_goals: profile.five_year_goals || '',
-            };
-
-            methods.reset(formData);
-          }
+          methods.reset(formData);
         } catch (error) {
           console.error('Error loading profile data:', error);
         } finally {
@@ -684,6 +829,13 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
       return;
     }
     
+    // Validate that mobile phone is provided before sending assessment
+    if (!data.mobile_phone || data.mobile_phone.trim() === '') {
+      showAlert('נדרש מספר טלפון נייד כדי לשלוח את ההערכה. ההערכה תישלח אליך בוואטסאפ.', 'error');
+      setIsSubmitting(false);
+      return;
+    }
+    
     try {
       // Transform form data to match Assessment type
       const assessmentData = {
@@ -821,6 +973,9 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
       // Then submit to webhook instead of analysis
       const result = await submitAssessmentToWebhook(assessment);
       if ('success' in result && result.success) {
+        // Clear localStorage since assessment was successfully submitted
+        clearLocalStorage();
+        
         // Show loader at least 1 second before redirect so user can see it
         await new Promise(res => setTimeout(res, 1000));
         router.push(`/assessment/success?id=${assessment.id}`);
@@ -921,6 +1076,9 @@ const MultiStepForm: React.FC<MultiStepFormProps> = ({ assessmentId }) => {
         throw new Error('Failed to delete assessment');
       }
 
+      // Clear localStorage since draft was deleted
+      clearLocalStorage();
+      
       showAlert('הטיוטה נמחקה בהצלחה', 'success');
       console.log('Draft deletion completed successfully');
       router.push('/dashboard');
