@@ -12,14 +12,12 @@ const nextConfig = {
     }
     config.externals.push('puppeteer');
     
-    // Externalize PDF libraries for server-side to avoid bundling issues
+    // Externalize canvas for server-side
     if (isServer) {
       config.externals.push('canvas');
-      // Note: We're not externalizing pdf-parse because it needs to be bundled,
-      // but we'll exclude its test files below
     }
 
-    // Handle Node.js modules for pdf-parse
+    // Handle Node.js modules
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -37,12 +35,26 @@ const nextConfig = {
       };
     }
     
-    // Exclude test PDF files from being bundled (they cause ENOENT errors)
+    // Exclude test and data directories from pdf-parse to avoid ENOENT errors
+    const webpack = require('webpack');
+    config.plugins = config.plugins || [];
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /^\.\/test\//,
+        contextRegExp: /pdf-parse/,
+      }),
+      new webpack.IgnorePlugin({
+        resourceRegExp: /^\.\/data\//,
+        contextRegExp: /pdf-parse/,
+      })
+    );
+    
+    // Ignore PDF files from being processed
     config.module.rules.push({
       test: /\.pdf$/,
       type: 'asset/resource',
       generator: {
-        emit: false, // Don't emit PDF files at all
+        emit: false,
       },
     });
 
@@ -51,15 +63,6 @@ const nextConfig = {
       exclude: /node_modules/,
       use: ['ignore-loader'],
     });
-    
-    // Use IgnorePlugin to completely exclude test directories
-    const webpack = require('webpack');
-    config.plugins.push(
-      new webpack.IgnorePlugin({
-        resourceRegExp: /test\/data/,
-        contextRegExp: /pdf-parse/,
-      })
-    );
 
     return config;
   },
