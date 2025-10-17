@@ -33,6 +33,12 @@ interface BusinessBuyReadinessFormData {
   businessName?: string;
 }
 
+interface QuickCounselingFormData {
+  fullName: string;
+  mobile: string;
+  email: string;
+}
+
 interface EmailResult {
   success: boolean;
   error?: string;
@@ -360,6 +366,94 @@ export async function sendConsultationEmail(formData: ConsultationFormData): Pro
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to send consultation email'
+    };
+  }
+}
+
+export async function sendQuickCounselingEmail(formData: QuickCounselingFormData): Promise<EmailResult> {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.error('RESEND_API_KEY is not set');
+      return { success: false, error: 'Missing email configuration' };
+    }
+
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
+    const html = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="he">
+        <head>
+          <meta charset="utf-8">
+          <title>בקשת ייעוץ מהיר - SmartRisk</title>
+          <style>
+            * { direction: rtl; text-align: right; }
+            body { 
+              font-family: Arial, sans-serif; 
+              line-height: 1.6; 
+              color: #333; 
+              max-width: 600px; 
+              margin: 0 auto; 
+              padding: 20px; 
+              direction: rtl; 
+            }
+            h1, h2, p { text-align: right; margin-right: 0; margin-left: auto; }
+            .contact-info { 
+              margin: 20px 0; 
+              padding: 20px; 
+              background: #f8fafc; 
+              border-radius: 8px;
+              text-align: right;
+            }
+            .footer { 
+              margin-top: 40px; 
+              padding-top: 20px; 
+              border-top: 1px solid #e2e8f0; 
+              font-size: 14px; 
+              color: #64748b;
+              text-align: right;
+            }
+            strong { padding-left: 5px; }
+          </style>
+        </head>
+        <body>
+          <div style="direction: rtl; text-align: right;">
+            <h1>בקשת ייעוץ מהיר - SmartRisk</h1>
+            
+            <div class="contact-info">
+              <h2>פרטי הפונה</h2>
+              <p><strong>שם מלא:</strong> ${formData.fullName}</p>
+              <p><strong>טלפון נייד:</strong> ${formData.mobile}</p>
+              <p><strong>דואר אלקטרוני:</strong> ${formData.email}</p>
+            </div>
+
+            <div class="footer">
+              <p>בקשה זו נשלחה דרך טופס הייעוץ המהיר למכירת עסק באתר SmartRisk.</p>
+              <p>הפונה מעוניין בייעוץ ראשוני חינם למכירת העסק.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const { data, error } = await resend.emails.send({
+      from: 'SmartRisk Quick Counseling <onboarding@resend.dev>',
+      to: 'itaisd@gmail.com', // Send to your email (Resend limitation until domain verified)
+      subject: 'בקשת ייעוץ מהיר - SmartRisk',
+      html: html,
+      replyTo: formData.email
+    });
+
+    if (error) {
+      console.error('Error sending quick counseling email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error in sendQuickCounselingEmail:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to send quick counseling email'
     };
   }
 }

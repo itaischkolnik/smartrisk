@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { generateBusinessAnalysis } from '@/services/openai';
+import { generateBusinessAnalysis, analyzeFilesForFinancialData } from '@/services/openai';
 import { sendEmail } from '@/services/email';
 import { auth } from '@/lib/supabase/auth';
 
@@ -75,13 +75,62 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     console.log('Available sections:', Object.keys(sectionData));
 
+    // Fetch uploaded files for analysis
+    console.log('Fetching files for assessment_id:', id);
+    const { data: files, error: filesError } = await supabase
+      .from('files')
+      .select('*')
+      .eq('assessment_id', id);
+
+    if (filesError) {
+      console.error('Error fetching files:', filesError);
+      // Continue without files rather than failing completely
+    }
+
+    console.log('Files found for analysis:', files?.length || 0);
+    
+    // Process and analyze files if they exist
+    let fileAnalysisResults: any[] = [];
+    if (files && files.length > 0) {
+      try {
+        console.log('Starting file analysis for assessment...');
+        
+        // Use the imported file analysis function
+        
+        // Filter files that should be analyzed (profit & loss and form 11)
+        const filesToAnalyze = files.filter(file => 
+          file.file_category && (
+            file.file_category.startsWith('profit_loss_') || 
+            file.file_category === 'form_11'
+          )
+        );
+
+        if (filesToAnalyze.length > 0) {
+          console.log(`Analyzing ${filesToAnalyze.length} financial files`);
+          
+          // Set timeout for file analysis
+          const analysisPromise = analyzeFilesForFinancialData(filesToAnalyze);
+          const timeoutPromise = new Promise<any[]>((_, reject) => {
+            setTimeout(() => reject(new Error('File analysis timeout')), 30000); // 30 second timeout
+          });
+          
+          fileAnalysisResults = await Promise.race([analysisPromise, timeoutPromise]);
+          console.log('File analysis completed:', fileAnalysisResults.length, 'files analyzed');
+        }
+      } catch (error) {
+        console.error('Error in file analysis:', error);
+        // Continue with assessment generation even if file analysis fails
+        fileAnalysisResults = [];
+      }
+    }
+
     try {
-      // Format data for OpenAI analysis
+      // Format data for OpenAI analysis including file analysis results
       const analysisData = {
         businessDetails: sectionData.business_details || {},
         swotAnalysis: sectionData.swot_analysis || {},
         personalQuestionnaire: sectionData.personal_questionnaire || {},
-        files: [] // We'll handle files later if needed
+        files: fileAnalysisResults || []
       };
 
       console.log('Data being sent to OpenAI:', JSON.stringify(analysisData, null, 2));
@@ -90,12 +139,19 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       const analysisResult = await generateBusinessAnalysis(analysisData);
       console.log('Analysis generated successfully');
 
-      // Update analysis record with results
+      // Update analysis record with results including file analysis
       console.log('Saving analysis results...');
+      const analysisContent = {
+        content: analysisResult.content,
+        fileAnalysisResults: fileAnalysisResults,
+        filesAnalyzed: fileAnalysisResults.length,
+        analysisTimestamp: new Date().toISOString()
+      };
+
       const { error: saveError } = await supabase
         .from('analyses')
         .update({
-          analysis_content: analysisResult.content,
+          analysis_content: analysisContent,
           overall_risk_score: analysisResult.riskScore / 10, // Convert 0-100 to 0-10
           status: 'completed',
           updated_at: new Date().toISOString()

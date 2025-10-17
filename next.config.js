@@ -11,6 +11,12 @@ const nextConfig = {
       config.externals = [];
     }
     config.externals.push('puppeteer');
+    
+    // Externalize pdfjs-dist for server-side to avoid bundling issues
+    if (isServer) {
+      config.externals.push('pdfjs-dist');
+      config.externals.push('canvas');
+    }
 
     // Handle Node.js modules for pdf-parse
     if (!isServer) {
@@ -26,13 +32,36 @@ const nextConfig = {
         buffer: false,
         util: false,
         zlib: false,
+        canvas: false,
       };
     }
+    
+    // Ignore test files and worker files from pdfjs-dist
+    config.module.rules.push({
+      test: /\.pdf$/,
+      type: 'asset/resource',
+    });
+    
+    config.module.rules.push({
+      test: /pdf\.worker\.(min\.)?js/,
+      type: 'asset/resource',
+    });
 
     config.module.rules.push({
       test: /\.map$/,
       exclude: /node_modules/,
       use: ['ignore-loader'],
+    });
+    
+    // Exclude test data from being bundled
+    config.module.rules.push({
+      test: /node_modules\/pdfjs-dist\/.*test.*\.pdf$/,
+      use: 'null-loader',
+    });
+    
+    config.module.rules.push({
+      test: /node_modules\/pdf-parse\/.*test.*\.pdf$/,
+      use: 'null-loader',
     });
 
     return config;

@@ -24,6 +24,7 @@
     "@types/pdfkit": "^0.13.9",
     "@vercel/og": "^0.6.2",
     "bufferutil": "^4.0.8",
+    "canvas": "^3.2.0",
     "chart.js": "^4.4.9",
     "chrome-aws-lambda": "^10.1.0",
     "dotenv": "^17.2.1",

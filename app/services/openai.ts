@@ -43,10 +43,10 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
   return Promise.race([promise, timeout]);
 }
 
-// Function to extract text from PDF file URL using OpenAI's vision capabilities
-async function extractTextFromFile(fileUrl: string): Promise<string> {
+// Function to extract text from image-based PDF using OpenAI Vision API
+async function extractTextFromImagePDF(buffer: Buffer): Promise<string> {
   try {
-    console.log('Extracting text from PDF file:', fileUrl);
+    console.log('Attempting to extract text from image-based PDF using OpenAI Vision...');
     
     if (!process.env.OPENAI_API_KEY) {
       throw new Error('OpenAI API key not configured');
@@ -56,83 +56,94 @@ async function extractTextFromFile(fileUrl: string): Promise<string> {
       apiKey: process.env.OPENAI_API_KEY
     });
 
-    // Download the file
-    const response = await fetch(fileUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download file: ${response.statusText}`);
-    }
-
-    const buffer = await response.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString('base64');
-
-    // Use OpenAI's vision model to extract text from PDF pages
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
-      messages: [
-        {
-          role: "system",
-          content: "You are a document text extraction specialist. Extract ALL text content from this document image, preserving the original structure and formatting as much as possible. Include all numbers, labels, and text exactly as they appear."
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: "Please extract all text content from this document. Pay special attention to financial numbers, Hebrew text, and maintain the original structure."
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:application/pdf;base64,${base64}`,
-                detail: "high"
-              }
-            }
-          ]
-        }
-      ],
-      max_tokens: 4000,
-      temperature: 0.1
-    });
-
-    const extractedText = completion.choices[0]?.message?.content || '';
-    console.log('Successfully extracted text from PDF:', extractedText.substring(0, 200) + '...');
-    return extractedText;
-
-  } catch (error) {
-    console.error('Error extracting text from file:', error);
+    // Use pdf-lib to convert PDF pages to images
+    const { PDFDocument } = await import('pdf-lib');
+    const uint8Array = new Uint8Array(buffer);
+    const pdfDoc = await PDFDocument.load(uint8Array);
+    const numPages = pdfDoc.getPageCount();
+    console.log(`PDF has ${numPages} pages, extracting text from first page only for image-based PDFs...`);
     
-    // Fallback: Try to use pdf-parse library for direct PDF text extraction
-    try {
-      console.log('Attempting fallback PDF text extraction using pdf-parse...');
-      
-      // Download the file again for pdf-parse
-      const pdfResponse = await fetch(fileUrl);
-      if (!pdfResponse.ok) {
-        throw new Error(`Failed to download PDF for fallback: ${pdfResponse.statusText}`);
-      }
+    // For now, we'll convert the entire first page to an image
+    // Note: This is a simplified approach - in production you might want to use a library like pdf2pic
+    // Since pdf-lib doesn't directly convert to images, we'll use a different approach
+    
+    // Convert buffer to base64 for a different attempt - using a PNG conversion service or library
+    // For this implementation, we'll throw an error to indicate this needs OCR service
+    throw new Error('Image-based PDF detected. Please use a PDF with selectable text or implement OCR service integration.');
+    
+  } catch (error) {
+    console.error('Error extracting text from image-based PDF:', error);
+    throw error;
+  }
+}
 
-      const pdfBuffer = await pdfResponse.arrayBuffer();
-      
-      // Dynamically import pdf-parse only on server side
-      const pdfParse = (await import('pdf-parse')).default;
-      const data = await pdfParse(Buffer.from(pdfBuffer));
-      
-      if (data.text && data.text.trim().length > 0) {
-        console.log('Successfully extracted text using pdf-parse fallback');
-        return data.text;
-      } else {
-        throw new Error('PDF appears to be empty or contains no extractable text');
+// Function to extract text from PDF using pdfjs-dist (externalized, no bundling)
+async function extractTextFromFile(fileUrl: string): Promise<string> {
+  try {
+    console.log('Extracting text from PDF file:', fileUrl);
+    console.log('Using externalized pdfjs-dist (no webpack bundling)...');
+    
+    // With the externalized pdfjs-dist in next.config.js, this should work cleanly
+    const pdfjs = require('pdfjs-dist/legacy/build/pdf.js');
+    
+    // Disable worker completely
+    pdfjs.GlobalWorkerOptions.workerSrc = '';
+    
+    console.log('Loading PDF from URL...');
+    const loadingTask = pdfjs.getDocument({
+      url: fileUrl,
+      verbosity: 0,
+      standardFontDataUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/standard_fonts/',
+      cMapUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',
+      cMapPacked: true,
+    });
+    
+    const pdf = await loadingTask.promise;
+    console.log(`✓ PDF loaded successfully. Pages: ${pdf.numPages}`);
+    
+    let fullText = '';
+    
+    // Extract text from all pages
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      try {
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str || '')
+          .join(' ');
+        fullText += pageText + '\n';
+      } catch (pageError) {
+        console.warn(`Warning: Could not extract text from page ${pageNum}:`, pageError);
+        // Continue with other pages
       }
-    } catch (fallbackError) {
-      console.error('Fallback extraction also failed:', fallbackError);
-      throw new Error('Unable to extract text from PDF file. The file may be password-protected, corrupted, or contain only images. Please ensure the PDF contains readable text.');
     }
+    
+    if (!fullText || fullText.trim().length === 0) {
+      throw new Error('PDF contains no extractable text. It may be an image-based scan.');
+    }
+    
+    console.log(`✓ Successfully extracted ${fullText.length} characters`);
+    console.log('First 200 characters:', fullText.substring(0, 200));
+    
+    return fullText;
+    
+  } catch (error) {
+    console.error('Error extracting text from PDF:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(
+      `Failed to extract text from PDF: ${errorMessage}`
+    );
   }
 }
 
 // New function to analyze files for financial data
 export async function analyzeFilesForFinancialData(files: any[]): Promise<FileAnalysisResult[]> {
-  console.log('Starting file analysis for financial data...');
+  const startTime = Date.now();
+  console.log('========================================');
+  console.log('STARTING FILE ANALYSIS FOR FINANCIAL DATA');
+  console.log(`Total files to analyze: ${files.length}`);
+  console.log(`Files: ${files.map(f => f.name || f.file_name).join(', ')}`);
+  console.log('========================================');
   
   if (!process.env.OPENAI_API_KEY) {
     console.error('OpenAI API key not found');
@@ -177,21 +188,34 @@ export async function analyzeFilesForFinancialData(files: any[]): Promise<FileAn
 
       // Extract actual text from the PDF file
       try {
-        console.log(`Extracting text from file: ${file.name}`);
-        extractedText = await extractTextFromFile(file.file_url);
+        console.log(`========================================`);
+        console.log(`Processing file: ${file.name} (ID: ${file.id})`);
+        const fileUrl: string | undefined = (file as any).file_url || (file as any).url;
+        console.log(`File URL: ${fileUrl}`);
+        console.log(`File category: ${file.category || 'unknown'}`);
+        console.log(`========================================`);
+        
+        if (!fileUrl) {
+          throw new Error('File URL is missing on file object');
+        }
+        extractedText = await extractTextFromFile(fileUrl);
         
         if (!extractedText || extractedText.trim().length === 0) {
           throw new Error('No text could be extracted from the PDF file');
         }
         
-        console.log(`Successfully extracted ${extractedText.length} characters from ${file.name}`);
+        console.log(`✓ Successfully extracted ${extractedText.length} characters from ${file.name}`);
+        console.log(`Text preview: ${extractedText.substring(0, 150)}...`);
       } catch (extractionError) {
-        console.error(`Failed to extract text from ${file.name}:`, extractionError);
+        console.error(`✗ Failed to extract text from ${file.name}:`, extractionError);
+        const errorMsg = extractionError instanceof Error ? extractionError.message : 'Unknown error';
+        console.error(`Error details: ${errorMsg}`);
+        
         results.push({
           fileName: file.name,
           fileId: file.id,
           analysisSuccess: false,
-          error: `Text extraction failed: ${extractionError instanceof Error ? extractionError.message : 'Unknown error'}`
+          error: `Text extraction failed: ${errorMsg}`
         });
         continue;
       }
@@ -401,7 +425,7 @@ ${extractedText}`;
       console.log(`Successfully analyzed file: ${file.name}`);
 
     } catch (error) {
-      console.error(`Error analyzing file ${file.name}:`, error);
+      console.error(`✗ Error analyzing file ${file.name}:`, error);
       results.push({
         fileName: file.name,
         fileId: file.id,
@@ -411,7 +435,25 @@ ${extractedText}`;
     }
   }
 
-  console.log(`File analysis completed. Analyzed ${results.length} files.`);
+  const endTime = Date.now();
+  const duration = ((endTime - startTime) / 1000).toFixed(2);
+  const successCount = results.filter(r => r.analysisSuccess).length;
+  const failCount = results.filter(r => !r.analysisSuccess).length;
+  
+  console.log('========================================');
+  console.log('FILE ANALYSIS COMPLETED');
+  console.log(`Duration: ${duration} seconds`);
+  console.log(`Total files processed: ${results.length}`);
+  console.log(`Successful: ${successCount}`);
+  console.log(`Failed: ${failCount}`);
+  if (failCount > 0) {
+    console.log('Failed files:');
+    results.filter(r => !r.analysisSuccess).forEach(r => {
+      console.log(`  - ${r.fileName}: ${r.error}`);
+    });
+  }
+  console.log('========================================');
+  
   return results;
 }
 
@@ -438,6 +480,40 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
       filesCount: data.files.length
     });
 
+    // Process file analysis results for inclusion in prompt
+    let fileAnalysisText = '';
+    if (data.files && data.files.length > 0) {
+      fileAnalysisText = '\n\nנתוני ניתוח קבצים פיננסיים:\n';
+      
+      data.files.forEach((fileResult: any, index: number) => {
+        if (fileResult.analysisSuccess && fileResult.financialData) {
+          fileAnalysisText += `\nקובץ ${index + 1} (${fileResult.fileName}):\n`;
+          
+          // Add financial data from analysis
+          const financialData = fileResult.financialData;
+          if (financialData.שנה) fileAnalysisText += `שנה: ${financialData.שנה}\n`;
+          if (financialData.הכנסות) fileAnalysisText += `הכנסות: ${financialData.הכנסות.toLocaleString()} ₪\n`;
+          if (financialData['רווח העסק']) fileAnalysisText += `רווח העסק: ${financialData['רווח העסק'].toLocaleString()} ₪\n`;
+          if (financialData['רווח כולל']) fileAnalysisText += `רווח כולל: ${financialData['רווח כולל'].toLocaleString()} ₪\n`;
+          if (financialData['עלות המכר']) fileAnalysisText += `עלות המכר: ${financialData['עלות המכר'].toLocaleString()} ₪\n`;
+          if (financialData['הוצאות מנהליות']) fileAnalysisText += `הוצאות מנהליות: ${financialData['הוצאות מנהליות'].toLocaleString()} ₪\n`;
+          if (financialData['משכורות עובדים']) fileAnalysisText += `משכורות עובדים: ${financialData['משכורות עובדים'].toLocaleString()} ₪\n`;
+          if (financialData['משכורות בעלים']) fileAnalysisText += `משכורות בעלים: ${financialData['משכורות בעלים'].toLocaleString()} ₪\n`;
+          if (financialData['ערך ריהוט מטלטלין וציוד']) fileAnalysisText += `ערך ציוד: ${financialData['ערך ריהוט מטלטלין וציוד'].toLocaleString()} ₪\n`;
+          
+          // Add confidence and warnings if available
+          if (fileResult.confidence) {
+            fileAnalysisText += `רמת דיוק הניתוח: ${fileResult.confidence}%\n`;
+          }
+          if (fileResult.warnings && fileResult.warnings.length > 0) {
+            fileAnalysisText += `אזהרות: ${fileResult.warnings.join(', ')}\n`;
+          }
+        } else if (fileResult.error) {
+          fileAnalysisText += `\nקובץ ${index + 1} (${fileResult.fileName}): שגיאה בניתוח - ${fileResult.error}\n`;
+        }
+      });
+    }
+
     const prompt = `נתח את העסק הזה בקצרה:
     
     פרטי העסק:
@@ -448,16 +524,17 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
     
     שאלון אישי:
     ${JSON.stringify(data.personalQuestionnaire, null, 2)}
+    ${fileAnalysisText}
     
     קבצים נוספים: ${data.files.length} קבצים מצורפים
     
     אנא ספק ניתוח תמציתי הכולל:
     
-    1. גורמי סיכון עיקריים (2-3 נקודות)
-    2. המלצות מהירות (2-3 נקודות)
-    3. ציון סיכון
+    1. גורמי סיכון עיקריים (2-3 נקודות) - כלול התייחסות לנתונים הפיננסיים מהקבצים אם קיימים
+    2. המלצות מהירות (2-3 נקודות) - בהתבסס על הנתונים הפיננסיים המנותחים
+    3. ציון סיכון - קח בחשבון את הנתונים הפיננסיים בחישוב הציון
     
-    חשוב: היה תמציתי וממוקד.
+    חשוב: היה תמציתי וממוקד. אם יש נתונים פיננסיים מנותחים מהקבצים, השתמש בהם לחיזוק הניתוח.
     כלול ציון סיכון בפורמט 'ציון סיכון: X' כאשר X הוא מספר בין 0 ל-100.
     ציונים גבוהים יותר (קרובים ל-100) מציינים סיכון נמוך יותר.`;
 

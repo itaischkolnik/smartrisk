@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { FiCheckCircle, FiAlertCircle, FiTrendingUp, FiBarChart, FiTarget, FiAward } from 'react-icons/fi';
 
 interface AssessmentForm {
@@ -82,6 +82,15 @@ const BusinessSaleReadiness = () => {
     kpis_available: ''
   });
 
+  // Quick counseling form state
+  const [quickCounselingData, setQuickCounselingData] = useState({
+    fullName: '',
+    mobile: '',
+    email: ''
+  });
+  const [isSubmittingCounseling, setIsSubmittingCounseling] = useState(false);
+  const [counselingMessage, setCounselingMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
   const [showResults, setShowResults] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -118,6 +127,96 @@ const BusinessSaleReadiness = () => {
   const [isSubmittingContact, setIsSubmittingContact] = useState(false);
   const [contactSubmitMessage, setContactSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
+  // Quick counseling form handlers
+  const handleQuickCounselingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setQuickCounselingData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleQuickCounselingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingCounseling(true);
+    setCounselingMessage(null);
+
+    // GTM tracking - form submission attempt
+    if (typeof window !== 'undefined' && (window as any).dataLayer) {
+      (window as any).dataLayer.push({
+        event: 'form_submit',
+        form_name: 'quick_counseling_form',
+        form_location: 'business_sale_readiness_top',
+        page_url: window.location.href
+      });
+    }
+
+    try {
+      const response = await fetch('/api/quick-counseling', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(quickCounselingData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setCounselingMessage({ type: 'success', text: data.message });
+        setQuickCounselingData({ fullName: '', mobile: '', email: '' });
+        
+        // GTM tracking - successful form submission
+        if (typeof window !== 'undefined' && (window as any).dataLayer) {
+          (window as any).dataLayer.push({
+            event: 'form_submit_success',
+            form_name: 'quick_counseling_form',
+            form_location: 'business_sale_readiness_top',
+            page_url: window.location.href,
+            user_email: quickCounselingData.email
+          });
+        }
+
+        // Google Ads conversion tracking - Quick Counseling Leads
+        if (typeof window !== 'undefined' && (window as any).gtag) {
+          (window as any).gtag('event', 'conversion', {
+            'send_to': 'AW-17587996191/hdQ3COXcgp8bEJ-MzsJB',
+            'value': 1.0,
+            'currency': 'ILS'
+          });
+        }
+      } else {
+        setCounselingMessage({ type: 'error', text: data.error });
+        
+        // GTM tracking - form submission error
+        if (typeof window !== 'undefined' && (window as any).dataLayer) {
+          (window as any).dataLayer.push({
+            event: 'form_submit_error',
+            form_name: 'quick_counseling_form',
+            form_location: 'business_sale_readiness_top',
+            page_url: window.location.href,
+            error_message: data.error
+          });
+        }
+      }
+    } catch (error) {
+      setCounselingMessage({ type: 'error', text: 'שגיאה בשליחת הטופס. אנא נסה שוב.' });
+      
+      // GTM tracking - form submission error
+      if (typeof window !== 'undefined' && (window as any).dataLayer) {
+        (window as any).dataLayer.push({
+          event: 'form_submit_error',
+          form_name: 'quick_counseling_form',
+          form_location: 'business_sale_readiness_top',
+          page_url: window.location.href,
+          error_message: 'Network or server error'
+        });
+      }
+    } finally {
+      setIsSubmittingCounseling(false);
+    }
+  };
+
   const handleInputChange = (field: keyof AssessmentForm, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -133,6 +232,18 @@ const BusinessSaleReadiness = () => {
       const result = generateAnalysis();
       setAnalysis(result);
       setShowResults(true);
+      
+      // GTM tracking - questionnaire completed
+      if (typeof window !== 'undefined' && (window as any).dataLayer) {
+        (window as any).dataLayer.push({
+          event: 'questionnaire_completed',
+          form_name: 'business_sale_readiness_questionnaire',
+          page_url: window.location.href,
+          assessment_score: result.overall_score,
+          readiness_level: result.readiness_level,
+          questions_answered: questions.length
+        });
+      }
     }
   };
 
@@ -159,6 +270,18 @@ const BusinessSaleReadiness = () => {
     setIsSubmittingContact(true);
     setContactSubmitMessage(null);
 
+    // GTM tracking - form submission attempt
+    if (typeof window !== 'undefined' && (window as any).dataLayer) {
+      (window as any).dataLayer.push({
+        event: 'form_submit',
+        form_name: 'consultation_form',
+        form_location: 'business_sale_readiness_bottom',
+        page_url: window.location.href,
+        assessment_score: analysis?.overall_score || 0,
+        readiness_level: analysis?.readiness_level || ''
+      });
+    }
+
     try {
       const response = await fetch('/api/consultation', {
         method: 'POST',
@@ -179,11 +302,48 @@ const BusinessSaleReadiness = () => {
       if (response.ok) {
         setContactSubmitMessage({ type: 'success', text: data.message });
         setContactFormData({ fullName: '', mobile: '', email: '' });
+        
+        // GTM tracking - successful form submission
+        if (typeof window !== 'undefined' && (window as any).dataLayer) {
+          (window as any).dataLayer.push({
+            event: 'form_submit_success',
+            form_name: 'consultation_form',
+            form_location: 'business_sale_readiness_bottom',
+            page_url: window.location.href,
+            user_email: contactFormData.email,
+            assessment_score: analysis?.overall_score || 0,
+            readiness_level: analysis?.readiness_level || ''
+          });
+        }
       } else {
         setContactSubmitMessage({ type: 'error', text: data.error });
+        
+        // GTM tracking - form submission error
+        if (typeof window !== 'undefined' && (window as any).dataLayer) {
+          (window as any).dataLayer.push({
+            event: 'form_submit_error',
+            form_name: 'consultation_form',
+            form_location: 'business_sale_readiness_bottom',
+            page_url: window.location.href,
+            error_message: data.error,
+            assessment_score: analysis?.overall_score || 0
+          });
+        }
       }
     } catch (error) {
       setContactSubmitMessage({ type: 'error', text: 'שגיאה בשליחת הטופס. אנא נסה שוב.' });
+      
+      // GTM tracking - form submission error
+      if (typeof window !== 'undefined' && (window as any).dataLayer) {
+        (window as any).dataLayer.push({
+          event: 'form_submit_error',
+          form_name: 'consultation_form',
+          form_location: 'business_sale_readiness_bottom',
+          page_url: window.location.href,
+          error_message: 'Network or server error',
+          assessment_score: analysis?.overall_score || 0
+        });
+      }
     } finally {
       setIsSubmittingContact(false);
     }
@@ -601,7 +761,7 @@ const BusinessSaleReadiness = () => {
             color: '#ffffff',
             textShadow: '1px 1px 2px rgba(0,0,0,0.5)'
           }}>
-            שאלון מוכנות למכירת העסק – בדוק את עצמך
+            שאלון מוכנות למכירת העסק – בדקו את עצמכם בחינם
           </div>
         </div>
         
@@ -745,40 +905,134 @@ const BusinessSaleReadiness = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-20">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-12 md:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="flex justify-center mb-6">
-            <FiTarget className="w-16 h-16 text-yellow-300" />
-          </div>
-          <h1 className="text-4xl md:text-6xl font-bold mb-6">
+          <h1 className="text-4xl md:text-6xl font-bold mb-6 flex items-center justify-center gap-4">
+            <FiTarget className="hidden md:block w-16 h-16 text-yellow-300" />
             האם העסק שלך מוכן למכירה?
           </h1>
-          <p className="text-xl md:text-2xl text-blue-100 max-w-3xl mx-auto leading-relaxed">
-            בדוק את רמת המוכנות של העסק שלך למכירה עם כלי ההערכה המתקדם שלנו
+          <p className="text-lg md:text-xl text-blue-100 max-w-4xl mx-auto leading-relaxed mb-6">
+            מכירת עסק זו אחת ההחלטות הגדולות והמורכבות ביותר בחיים.
+            בלי הכנה נכונה אפשר לפספס קונים רציניים, להפסיד כסף גדול,
+            ואף להיתקע חודשים ארוכים בלי עסקה.
           </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-4">
+          <p className="text-xl md:text-2xl text-white max-w-3xl mx-auto leading-relaxed mb-4">
+            אנחנו כאן כדי לוודא שזה לא יקרה לך!
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-1">
             <div className="flex items-center text-blue-100">
               <FiCheckCircle className="w-5 h-5 mr-2" />
-              <span>הערכה מקיפה ב-6 תחומים</span>
+              <span style={{lineHeight: '0.5'}}>הערכה מקיפה ב-6 תחומים</span>
             </div>
             <div className="flex items-center text-blue-100">
               <FiTrendingUp className="w-5 h-5 mr-2" />
-              <span>ניתוח מפורט עם המלצות</span>
+              <span style={{lineHeight: '0.5'}}>ניתוח מפורט עם המלצות</span>
             </div>
             <div className="flex items-center text-blue-100">
               <FiAward className="w-5 h-5 mr-2" />
-              <span>ציון כללי מ-0 עד 100</span>
+              <span style={{lineHeight: '0.5'}}>ציון כללי מ-0 עד 100</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Quick Counseling Form Section */}
+      <div className="bg-white py-8 md:py-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-2xl md:text-4xl font-bold text-gray-900 mb-4 md:mb-6">
+            <span className="block md:hidden">
+              רוצים ייעוץ מהיר<br />עבור עסקים למכירה?
+            </span>
+            <span className="hidden md:block">
+              רוצים ייעוץ מהיר עבור עסקים למכירה?
+            </span>
+          </h2>
+          <p className="text-lg md:text-xl text-gray-600 mb-6 md:mb-8 max-w-2xl mx-auto">
+            מלאו את הטופס הבא וקבלו ייעוץ ראשוני חינם ממומחי המכירות שלנו
+          </p>
+          
+          <form onSubmit={handleQuickCounselingSubmit} className="flex flex-col md:flex-row gap-3 md:gap-4 items-stretch md:items-end justify-center max-w-4xl mx-auto">
+            <div className="flex-1 min-w-0">
+              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                שם מלא
+              </label>
+              <input
+                type="text"
+                id="fullName"
+                name="fullName"
+                value={quickCounselingData.fullName}
+                onChange={handleQuickCounselingChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
+                placeholder="הכניסו את שמכם המלא"
+                required
+              />
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <label htmlFor="mobile" className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                טלפון נייד
+              </label>
+              <input
+                type="tel"
+                id="mobile"
+                name="mobile"
+                value={quickCounselingData.mobile}
+                onChange={handleQuickCounselingChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
+                placeholder="050-1234567"
+                required
+              />
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                דואר אלקטרוני
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={quickCounselingData.email}
+                onChange={handleQuickCounselingChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
+                placeholder="example@email.com"
+                required
+              />
+            </div>
+            
+            <button
+              type="submit"
+              disabled={isSubmittingCounseling}
+              className={`bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-6 md:px-8 py-3 rounded-lg font-bold hover:from-blue-700 hover:to-indigo-800 transform hover:scale-105 transition-all duration-200 shadow-lg whitespace-nowrap w-full md:w-auto ${
+                isSubmittingCounseling ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {isSubmittingCounseling ? 'שולח...' : 'שלח'}
+            </button>
+          </form>
+          
+          {/* Success/Error Message */}
+          {counselingMessage && (
+            <div className={`mt-4 p-4 rounded-lg text-center ${
+              counselingMessage.type === 'success' 
+                ? 'bg-green-100 text-green-800 border border-green-200' 
+                : 'bg-red-100 text-red-800 border border-red-200'
+            }`}>
+              {counselingMessage.text}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Questionnaire Introduction Section */}
       <div className="bg-blue-200 py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-2xl md:text-4xl font-bold text-gray-900 mb-4 md:mb-6">
+            בדקו בחינם את רמת מוכנות העסק שלכם למכירה בעזרת כלי הערכה מתקדם
+          </h2>
           <div className="text-lg md:text-xl text-black leading-relaxed space-y-4">
             <p>
-              השאלון הבא יעזור לך להבין עד כמה העסק שלך מוכן לתהליך מכירה.
+              השאלון הבא יעזור לך להבין עד כמה העסק שלך מוכן לתהליך עסקים למכירה.
             </p>
             <p>
               מבוסס על ניסיון של מעל 10 שנים בליווי מאות עסקאות בישראל, הוא בודק היבטים פיננסיים, תפעוליים, משפטיים ועוד.

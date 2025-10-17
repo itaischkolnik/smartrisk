@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 import { createServerSupabaseClient } from '../../../lib/supabase/server';
 import { analyzeFilesForFinancialData, FileAnalysisResult } from '../../../services/openai';
 
@@ -259,8 +261,8 @@ export async function POST(request: Request) {
         if (filesToAnalyze.length > 0) {
           // Set a shorter timeout for file analysis to prevent overall timeout
           const analysisPromise = analyzeFilesForFinancialData(filesToAnalyze);
-          const timeoutPromise = new Promise<FileAnalysisResult[]>((_, reject) => {
-            setTimeout(() => reject(new Error('File analysis timeout')), 15000); // 15 second timeout
+        const timeoutPromise = new Promise<FileAnalysisResult[]>((_, reject) => {
+            setTimeout(() => reject(new Error('File analysis timeout')), 30000); // 30 second timeout
           });
           
           fileAnalysisResults = await Promise.race([analysisPromise, timeoutPromise]);
@@ -428,6 +430,57 @@ export async function POST(request: Request) {
       success: r.analysisSuccess,
       hasFinancialData: !!r.financialData
     })));
+
+    // Store file analysis results in the analyses table for future reference
+    if (fileAnalysisResults.length > 0) {
+      try {
+        console.log('Storing file analysis results in database...');
+        
+        // Check if an analysis record exists for this assessment
+        const { data: existingAnalysis } = await supabase
+          .from('analyses')
+          .select('id')
+          .eq('assessment_id', assessmentId)
+          .eq('user_id', userId)
+          .single();
+
+        if (existingAnalysis) {
+          // Update existing analysis with file results
+          await supabase
+            .from('analyses')
+            .update({
+              analysis_content: {
+                fileAnalysisResults: fileAnalysisResults,
+                filesAnalyzed: fileAnalysisResults.length,
+                webhookAnalysisTimestamp: new Date().toISOString()
+              },
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingAnalysis.id);
+        } else {
+          // Create new analysis record with file results
+          await supabase
+            .from('analyses')
+            .insert({
+              assessment_id: assessmentId,
+              user_id: userId,
+              status: 'completed',
+              analysis_content: {
+                fileAnalysisResults: fileAnalysisResults,
+                filesAnalyzed: fileAnalysisResults.length,
+                webhookAnalysisTimestamp: new Date().toISOString()
+              },
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+        }
+        
+        console.log('File analysis results stored in database successfully');
+      } catch (error) {
+        console.error('Error storing file analysis results:', error);
+        // Continue with webhook submission even if database storage fails
+      }
+    }
 
     // Send data to webhook
     console.log('Sending to webhook URL:', WEBHOOK_URL);
