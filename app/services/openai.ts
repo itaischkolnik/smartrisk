@@ -35,14 +35,6 @@ export interface FileAnalysisResult {
   warnings?: string[];
 }
 
-// Helper function to add timeout to promises
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  const timeout = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
-  });
-  return Promise.race([promise, timeout]);
-}
-
 // Function to extract text from image-based PDF using OpenAI Vision API
 async function extractTextFromImagePDF(buffer: Buffer): Promise<string> {
   try {
