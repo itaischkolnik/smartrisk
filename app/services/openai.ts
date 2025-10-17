@@ -79,70 +79,36 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
   ]);
 }
 
-// Function to extract text from PDF using pdf-parse (simple, serverless-friendly)
+// Simplified PDF extraction - skip text extraction in serverless environment
+// Instead, we'll rely on Make.com to handle PDF text extraction
 async function extractTextFromFile(fileUrl: string): Promise<string> {
   try {
-    console.log('Extracting text from PDF file:', fileUrl);
-    console.log('Using pdf-parse library...');
+    console.log('⚠️ Skipping PDF text extraction in serverless environment');
+    console.log('File URL will be sent to Make.com for external processing:', fileUrl);
     
-    // Download the PDF file with timeout
-    console.log('Downloading PDF from URL...');
+    // Verify the file is accessible
+    console.log('Verifying PDF file is accessible...');
     const response = await withTimeout(
-      fetch(fileUrl),
-      10000, // 10 second timeout for download
-      'PDF download timed out after 10 seconds'
+      fetch(fileUrl, { method: 'HEAD' }),
+      5000,
+      'PDF file verification timed out'
     );
     
     if (!response.ok) {
-      throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
-    }
-
-    const arrayBuffer = await withTimeout(
-      response.arrayBuffer(),
-      5000, // 5 second timeout for buffer
-      'Failed to read PDF buffer after 5 seconds'
-    );
-    
-    const buffer = Buffer.from(arrayBuffer);
-    console.log(`Downloaded PDF, buffer size: ${buffer.length} bytes`);
-    
-    if (buffer.length === 0) {
-      throw new Error('Downloaded file is empty (0 bytes)');
-    }
-
-    // Use pdf-parse with explicit import to avoid test files
-    console.log('Parsing PDF with pdf-parse...');
-    
-    // Import only what we need
-    const pdfParse = require('pdf-parse');
-    
-    // Parse with timeout (15 seconds max per PDF)
-    const data: any = await withTimeout(
-      pdfParse(buffer, {
-        max: 0, // Parse all pages
-        version: 'v2.0.550' // Specify version to avoid compatibility issues
-      }),
-      15000, // 15 second timeout for parsing
-      'PDF parsing timed out after 15 seconds'
-    );
-    
-    const extractedText = data.text;
-    
-    if (!extractedText || extractedText.trim().length === 0) {
-      throw new Error('PDF contains no extractable text. It may be an image-based scan.');
+      throw new Error(`PDF file not accessible: ${response.status} ${response.statusText}`);
     }
     
-    console.log(`✓ Successfully extracted ${extractedText.length} characters`);
-    console.log(`Pages: ${data.numpages}`);
-    console.log('First 200 characters:', extractedText.substring(0, 200));
+    const contentLength = response.headers.get('content-length');
+    console.log(`✓ PDF file is accessible (${contentLength ? `${contentLength} bytes` : 'size unknown'})`);
     
-    return extractedText;
+    // Return a placeholder that indicates the file should be processed by Make.com
+    return `[PDF_FILE_URL:${fileUrl}]`;
     
   } catch (error) {
-    console.error('Error extracting text from PDF:', error);
+    console.error('Error verifying PDF file:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     throw new Error(
-      `Failed to extract text from PDF: ${errorMessage}`
+      `Failed to verify PDF file: ${errorMessage}`
     );
   }
 }
@@ -228,6 +194,35 @@ export async function analyzeFilesForFinancialData(files: any[]): Promise<FileAn
           analysisSuccess: false,
           error: `Text extraction failed: ${errorMsg}`
         });
+        continue;
+      }
+
+      // Check if this is a placeholder (PDF file to be processed by Make.com)
+      if (extractedText.startsWith('[PDF_FILE_URL:')) {
+        console.log(`⚠️ Skipping OpenAI analysis for ${file.name} - will be processed by Make.com`);
+        
+        // Extract the file URL from the placeholder
+        const urlMatch = extractedText.match(/\[PDF_FILE_URL:(.*)\]/);
+        const pdfUrl = urlMatch ? urlMatch[1] : fileUrl;
+        
+        // Return success with metadata but no financial data
+        // Make.com will handle the actual PDF text extraction and analysis
+        results.push({
+          fileName: file.name,
+          fileId: file.id,
+          analysisSuccess: true,
+          financialData: {
+            _note: 'PDF processing deferred to Make.com',
+            _fileUrl: pdfUrl,
+            _fileName: file.name,
+            _fileCategory: file.category
+          },
+          confidence: 0,
+          extractedTextLength: 0,
+          warnings: ['PDF text extraction skipped - file will be processed by Make.com']
+        });
+        
+        console.log(`✓ File metadata prepared for ${file.name}`);
         continue;
       }
 
