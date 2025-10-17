@@ -94,82 +94,36 @@ async function extractTextFromFile(fileUrl: string): Promise<string> {
     const pdfBuffer = Buffer.from(arrayBuffer);
     console.log(`Downloaded PDF, buffer size: ${pdfBuffer.length} bytes`);
 
-    // Try unpdf first - modern, serverless-friendly PDF extractor
+    // Try unpdf - modern, serverless-friendly PDF extractor
     console.log('Attempting PDF text extraction using unpdf...');
     
-    try {
-      const { extractText } = await import('unpdf');
-      console.log('unpdf module loaded successfully');
-      
-      // Create a copy for unpdf to avoid buffer detachment
-      const unpdfBuffer = new Uint8Array(pdfBuffer);
-      const { text, totalPages } = await extractText(unpdfBuffer, {
-        mergePages: true,
-      });
-      console.log(`unpdf completed - extracted ${text?.length || 0} characters from ${totalPages} pages`);
-      
-      if (text && text.trim().length > 0) {
-        console.log('✓ Successfully extracted text using unpdf');
-        console.log(`First 200 chars: ${text.substring(0, 200)}`);
-        return text;
-      } else {
-        console.log('⚠️ unpdf returned empty text - PDF may be image-based, trying OpenAI Vision...');
-      }
-    } catch (parseError: any) {
-      console.error('unpdf failed:', parseError?.message);
-    }
-
-    // Fallback: Use OpenAI Vision API for image-based PDFs
-    console.log('Using OpenAI Vision API as fallback for image-based PDF...');
+    const { extractText } = await import('unpdf');
+    console.log('unpdf module loaded successfully');
     
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OpenAI API key not configured for OCR fallback');
-    }
-
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
+    // Create a copy for unpdf to avoid buffer detachment
+    const unpdfBuffer = new Uint8Array(pdfBuffer);
+    console.log('Created Uint8Array buffer for unpdf, size:', unpdfBuffer.length);
+    
+    const result = await extractText(unpdfBuffer, {
+      mergePages: true,
     });
-
-    // Use the original Buffer for base64 conversion
-    const base64Pdf = pdfBuffer.toString('base64');
     
-    // Use OpenAI Vision to extract text from the PDF/image
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o", // Latest model with better vision capabilities
-      messages: [
-        {
-          role: "system",
-          content: "You are a document text extraction specialist for Hebrew financial documents. Extract ALL text content from this document image, preserving numbers and structure exactly as they appear. Focus on financial data like revenue (הכנסות), profits (רווח), expenses, and years. Return the raw extracted text."
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: "Extract all text from this financial document. Pay special attention to:\n- Years (שנה)\n- Revenue/Income (הכנסות)\n- Business profit (רווח העסק)\n- Expenses and costs\n- All numbers and Hebrew labels\n\nReturn the raw text exactly as it appears."
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:application/pdf;base64,${base64Pdf}`,
-              }
-            }
-          ]
-        }
-      ],
-      max_tokens: 4000,
-      temperature: 0.1
+    console.log('unpdf extraction result:', {
+      textLength: result?.text?.length || 0,
+      totalPages: result?.totalPages || 0,
+      hasText: !!result?.text
     });
-
-    const extractedText = completion.choices[0]?.message?.content || '';
     
-    if (extractedText && extractedText.trim().length > 0) {
-      console.log('✓ Successfully extracted text using OpenAI Vision');
-      console.log(`Extracted ${extractedText.length} characters`);
-      console.log(`First 200 chars: ${extractedText.substring(0, 200)}`);
-      return extractedText;
+    if (result?.text && result.text.trim().length > 0) {
+      console.log('✓ Successfully extracted text using unpdf');
+      console.log(`Extracted ${result.text.length} characters from ${result.totalPages} pages`);
+      console.log(`First 500 chars: ${result.text.substring(0, 500)}`);
+      console.log(`Text contains Hebrew: ${/[\u0590-\u05FF]/.test(result.text)}`);
+      return result.text;
     } else {
-      throw new Error('Both unpdf and OpenAI Vision returned empty text');
+      console.error('⚠️ unpdf returned empty or no text');
+      console.error('Result object:', JSON.stringify(result, null, 2).substring(0, 500));
+      throw new Error('PDF contains no extractable text. The PDF may be image-based (scanned) or use unsupported encoding. Please provide a PDF with selectable text.');
     }
     
   } catch (error: any) {
