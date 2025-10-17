@@ -79,57 +79,27 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
   ]);
 }
 
-// Function to extract text from PDF using unpdf with OpenAI Vision fallback
+// Skip PDF text extraction - defer to Make.com for processing
 async function extractTextFromFile(fileUrl: string): Promise<string> {
   try {
-    console.log('Extracting text from PDF file:', fileUrl);
+    console.log('Verifying PDF file accessibility:', fileUrl);
     
-    // Download the file once and convert to Buffer immediately
-    const response = await fetch(fileUrl);
+    // Just verify the PDF is accessible
+    const response = await fetch(fileUrl, { method: 'HEAD' });
     if (!response.ok) {
-      throw new Error(`Failed to download file: ${response.statusText}`);
+      throw new Error(`PDF file not accessible: ${response.status} ${response.statusText}`);
     }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const pdfBuffer = Buffer.from(arrayBuffer);
-    console.log(`Downloaded PDF, buffer size: ${pdfBuffer.length} bytes`);
-
-    // Try unpdf - modern, serverless-friendly PDF extractor
-    console.log('Attempting PDF text extraction using unpdf...');
     
-    const { extractText } = await import('unpdf');
-    console.log('unpdf module loaded successfully');
+    const contentLength = response.headers.get('content-length');
+    console.log(`✓ PDF file is accessible (${contentLength ? `${contentLength} bytes` : 'size unknown'})`);
+    console.log('⚠️ Skipping text extraction - PDF URL will be sent to Make.com for OCR processing');
     
-    // Create a copy for unpdf to avoid buffer detachment
-    const unpdfBuffer = new Uint8Array(pdfBuffer);
-    console.log('Created Uint8Array buffer for unpdf, size:', unpdfBuffer.length);
-    
-    const result = await extractText(unpdfBuffer, {
-      mergePages: true,
-    });
-    
-    console.log('unpdf extraction result:', {
-      textLength: result?.text?.length || 0,
-      totalPages: result?.totalPages || 0,
-      hasText: !!result?.text
-    });
-    
-    if (result?.text && result.text.trim().length > 0) {
-      console.log('✓ Successfully extracted text using unpdf');
-      console.log(`Extracted ${result.text.length} characters from ${result.totalPages} pages`);
-      console.log(`First 500 chars: ${result.text.substring(0, 500)}`);
-      console.log(`Text contains Hebrew: ${/[\u0590-\u05FF]/.test(result.text)}`);
-      return result.text;
-    } else {
-      console.error('⚠️ unpdf returned empty or no text');
-      console.error('Result object:', JSON.stringify(result, null, 2).substring(0, 500));
-      throw new Error('PDF contains no extractable text. The PDF may be image-based (scanned) or use unsupported encoding. Please provide a PDF with selectable text.');
-    }
+    // Return a special marker that indicates this is a deferred extraction
+    return `[PDF_DEFERRED_TO_MAKE:${fileUrl}]`;
     
   } catch (error: any) {
-    console.error('Error extracting text from file:', error);
-    const errorDetails = `${error?.name || 'Error'}: ${error?.message || 'Unknown error'}`;
-    throw new Error(`Unable to extract text from PDF file. Details: ${errorDetails}. The file may be password-protected, corrupted, or require special handling.`);
+    console.error('Error verifying PDF file:', error);
+    throw new Error(`Failed to verify PDF file: ${error?.message || 'Unknown error'}`);
   }
 }
 
@@ -216,6 +186,34 @@ export async function analyzeFilesForFinancialData(files: any[]): Promise<FileAn
           analysisSuccess: false,
           error: `Text extraction failed: ${errorMsg}`
         });
+        continue;
+      }
+
+      // Check if this is a deferred extraction (PDF to be processed by Make.com)
+      if (extractedText.startsWith('[PDF_DEFERRED_TO_MAKE:')) {
+        console.log(`⚠️ Skipping OpenAI analysis for ${file.name} - will be processed by Make.com`);
+        
+        // Extract the file URL from the marker
+        const urlMatch = extractedText.match(/\[PDF_DEFERRED_TO_MAKE:(.*)\]/);
+        const pdfUrl = urlMatch ? urlMatch[1] : fileUrl;
+        
+        // Return success with metadata for Make.com to process
+        results.push({
+          fileName: file.name,
+          fileId: file.id,
+          analysisSuccess: true,
+          financialData: {
+            _note: 'PDF text extraction deferred to Make.com for OCR processing',
+            _fileUrl: pdfUrl,
+            _fileName: file.name,
+            _fileCategory: file.category
+          } as any,
+          confidence: 0,
+          extractedTextLength: 0,
+          warnings: ['PDF text extraction skipped - file will be processed by Make.com with OCR']
+        });
+        
+        console.log(`✓ File metadata prepared for Make.com: ${file.name}`);
         continue;
       }
 
