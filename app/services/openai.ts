@@ -79,7 +79,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
   ]);
 }
 
-// Function to extract text from PDF using unpdf (serverless-friendly)
+// Function to extract text from PDF using unpdf with OpenAI Vision fallback
 async function extractTextFromFile(fileUrl: string): Promise<string> {
   try {
     console.log('Extracting text from PDF file:', fileUrl);
@@ -93,7 +93,7 @@ async function extractTextFromFile(fileUrl: string): Promise<string> {
     const buffer = await response.arrayBuffer();
     console.log(`Downloaded PDF, buffer size: ${buffer.byteLength} bytes`);
 
-    // Use unpdf - modern, serverless-friendly PDF extractor
+    // Try unpdf first - modern, serverless-friendly PDF extractor
     console.log('Attempting PDF text extraction using unpdf...');
     
     try {
@@ -101,30 +101,78 @@ async function extractTextFromFile(fileUrl: string): Promise<string> {
       console.log('unpdf module loaded successfully');
       
       const { text, totalPages } = await extractText(new Uint8Array(buffer), {
-        mergePages: true, // Merge all pages into a single text
+        mergePages: true,
       });
-      console.log('unpdf completed successfully');
+      console.log(`unpdf completed - extracted ${text?.length || 0} characters from ${totalPages} pages`);
       
       if (text && text.trim().length > 0) {
-        console.log('Successfully extracted text using unpdf');
-        console.log(`Extracted ${text.length} characters from ${totalPages} pages`);
+        console.log('✓ Successfully extracted text using unpdf');
         console.log(`First 200 chars: ${text.substring(0, 200)}`);
         return text;
       } else {
-        console.error('PDF parsing returned empty text');
-        throw new Error('PDF appears to be empty or contains no extractable text');
+        console.log('⚠️ unpdf returned empty text - PDF may be image-based, trying OpenAI Vision...');
       }
     } catch (parseError: any) {
-      console.error('unpdf failed with error:', parseError);
-      console.error('Error name:', parseError?.name);
-      console.error('Error message:', parseError?.message);
-      console.error('Error stack:', parseError?.stack);
-      throw parseError;
+      console.error('unpdf failed:', parseError?.message);
     }
+
+    // Fallback: Use OpenAI Vision API for image-based PDFs
+    console.log('Using OpenAI Vision API as fallback for image-based PDF...');
+    
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OpenAI API key not configured for OCR fallback');
+    }
+
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    });
+
+    // Convert PDF buffer to base64
+    const base64Pdf = Buffer.from(buffer).toString('base64');
+    
+    // Use OpenAI Vision to extract text from the PDF/image
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o", // Latest model with better vision capabilities
+      messages: [
+        {
+          role: "system",
+          content: "You are a document text extraction specialist for Hebrew financial documents. Extract ALL text content from this document image, preserving numbers and structure exactly as they appear. Focus on financial data like revenue (הכנסות), profits (רווח), expenses, and years. Return the raw extracted text."
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Extract all text from this financial document. Pay special attention to:\n- Years (שנה)\n- Revenue/Income (הכנסות)\n- Business profit (רווח העסק)\n- Expenses and costs\n- All numbers and Hebrew labels\n\nReturn the raw text exactly as it appears."
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:application/pdf;base64,${base64Pdf}`,
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 4000,
+      temperature: 0.1
+    });
+
+    const extractedText = completion.choices[0]?.message?.content || '';
+    
+    if (extractedText && extractedText.trim().length > 0) {
+      console.log('✓ Successfully extracted text using OpenAI Vision');
+      console.log(`Extracted ${extractedText.length} characters`);
+      console.log(`First 200 chars: ${extractedText.substring(0, 200)}`);
+      return extractedText;
+    } else {
+      throw new Error('Both unpdf and OpenAI Vision returned empty text');
+    }
+    
   } catch (error: any) {
     console.error('Error extracting text from file:', error);
     const errorDetails = `${error?.name || 'Error'}: ${error?.message || 'Unknown error'}`;
-    throw new Error(`Unable to extract text from PDF file. Details: ${errorDetails}. The file may be password-protected, corrupted, or contain only images.`);
+    throw new Error(`Unable to extract text from PDF file. Details: ${errorDetails}. The file may be password-protected, corrupted, or require special handling.`);
   }
 }
 
