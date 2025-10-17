@@ -84,14 +84,15 @@ async function extractTextFromFile(fileUrl: string): Promise<string> {
   try {
     console.log('Extracting text from PDF file:', fileUrl);
     
-    // Download the file
+    // Download the file once and convert to Buffer immediately
     const response = await fetch(fileUrl);
     if (!response.ok) {
       throw new Error(`Failed to download file: ${response.statusText}`);
     }
 
-    const buffer = await response.arrayBuffer();
-    console.log(`Downloaded PDF, buffer size: ${buffer.byteLength} bytes`);
+    const arrayBuffer = await response.arrayBuffer();
+    const pdfBuffer = Buffer.from(arrayBuffer);
+    console.log(`Downloaded PDF, buffer size: ${pdfBuffer.length} bytes`);
 
     // Try unpdf first - modern, serverless-friendly PDF extractor
     console.log('Attempting PDF text extraction using unpdf...');
@@ -100,7 +101,9 @@ async function extractTextFromFile(fileUrl: string): Promise<string> {
       const { extractText } = await import('unpdf');
       console.log('unpdf module loaded successfully');
       
-      const { text, totalPages } = await extractText(new Uint8Array(buffer), {
+      // Create a copy for unpdf to avoid buffer detachment
+      const unpdfBuffer = new Uint8Array(pdfBuffer);
+      const { text, totalPages } = await extractText(unpdfBuffer, {
         mergePages: true,
       });
       console.log(`unpdf completed - extracted ${text?.length || 0} characters from ${totalPages} pages`);
@@ -127,8 +130,8 @@ async function extractTextFromFile(fileUrl: string): Promise<string> {
       apiKey: process.env.OPENAI_API_KEY
     });
 
-    // Convert PDF buffer to base64
-    const base64Pdf = Buffer.from(buffer).toString('base64');
+    // Use the original Buffer for base64 conversion
+    const base64Pdf = pdfBuffer.toString('base64');
     
     // Use OpenAI Vision to extract text from the PDF/image
     const completion = await openai.chat.completions.create({
