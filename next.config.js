@@ -11,13 +11,8 @@ const nextConfig = {
       config.externals = [];
     }
     config.externals.push('puppeteer');
-    
-    // Externalize canvas for server-side
-    if (isServer) {
-      config.externals.push('canvas');
-    }
 
-    // Handle Node.js modules
+    // Handle Node.js modules for pdf-parse
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -31,32 +26,8 @@ const nextConfig = {
         buffer: false,
         util: false,
         zlib: false,
-        canvas: false,
       };
     }
-    
-    // Exclude test and data directories from pdf-parse to avoid ENOENT errors
-    const webpack = require('webpack');
-    config.plugins = config.plugins || [];
-    config.plugins.push(
-      new webpack.IgnorePlugin({
-        resourceRegExp: /^\.\/test\//,
-        contextRegExp: /pdf-parse/,
-      }),
-      new webpack.IgnorePlugin({
-        resourceRegExp: /^\.\/data\//,
-        contextRegExp: /pdf-parse/,
-      })
-    );
-    
-    // Ignore PDF files from being processed
-    config.module.rules.push({
-      test: /\.pdf$/,
-      type: 'asset/resource',
-      generator: {
-        emit: false,
-      },
-    });
 
     config.module.rules.push({
       test: /\.map$/,

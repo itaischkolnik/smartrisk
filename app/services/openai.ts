@@ -79,64 +79,37 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
   ]);
 }
 
-// Function to extract text from PDF using pdf-parse with dynamic import
+// Function to extract text from PDF file URL - original working version
 async function extractTextFromFile(fileUrl: string): Promise<string> {
   try {
     console.log('Extracting text from PDF file:', fileUrl);
     
-    // Download the PDF file
-    console.log('Downloading PDF from URL...');
-    const response = await withTimeout(
-      fetch(fileUrl),
-      10000,
-      'PDF download timed out after 10 seconds'
-    );
-    
+    // Download the file
+    const response = await fetch(fileUrl);
     if (!response.ok) {
-      throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to download file: ${response.statusText}`);
     }
 
-    const arrayBuffer = await withTimeout(
-      response.arrayBuffer(),
-      5000,
-      'Failed to read PDF buffer after 5 seconds'
-    );
-    
-    const buffer = Buffer.from(arrayBuffer);
-    console.log(`Downloaded PDF, buffer size: ${buffer.length} bytes`);
-    
-    if (buffer.length === 0) {
-      throw new Error('Downloaded file is empty (0 bytes)');
-    }
+    const buffer = await response.arrayBuffer();
+    console.log(`Downloaded PDF, buffer size: ${buffer.byteLength} bytes`);
 
-    // Use dynamic import to avoid bundling issues with pdf-parse
-    console.log('Parsing PDF with pdf-parse (dynamic import)...');
+    // Try pdf-parse with dynamic import (original working approach)
+    console.log('Attempting PDF text extraction using pdf-parse...');
+    
+    // Dynamically import pdf-parse only on server side
     const pdfParse = (await import('pdf-parse')).default;
+    const data = await pdfParse(Buffer.from(buffer));
     
-    const data = await withTimeout(
-      pdfParse(buffer),
-      15000,
-      'PDF parsing timed out after 15 seconds'
-    );
-    
-    const extractedText = data.text;
-    
-    if (!extractedText || extractedText.trim().length === 0) {
-      throw new Error('PDF contains no extractable text. It may be an image-based scan.');
+    if (data.text && data.text.trim().length > 0) {
+      console.log('Successfully extracted text using pdf-parse');
+      console.log(`Extracted ${data.text.length} characters from ${data.numpages} pages`);
+      return data.text;
+    } else {
+      throw new Error('PDF appears to be empty or contains no extractable text');
     }
-    
-    console.log(`✓ Successfully extracted ${extractedText.length} characters`);
-    console.log(`Pages: ${data.numpages}`);
-    console.log('First 200 characters:', extractedText.substring(0, 200));
-    
-    return extractedText;
-    
   } catch (error) {
-    console.error('Error extracting text from PDF:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    throw new Error(
-      `Failed to extract text from PDF: ${errorMessage}`
-    );
+    console.error('Error extracting text from file:', error);
+    throw new Error('Unable to extract text from PDF file. The file may be password-protected, corrupted, or contain only images. Please ensure the PDF contains readable text.');
   }
 }
 
