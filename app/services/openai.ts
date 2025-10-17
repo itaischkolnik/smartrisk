@@ -77,20 +77,40 @@ async function extractTextFromImagePDF(buffer: Buffer): Promise<string> {
   }
 }
 
+// Timeout wrapper for async operations
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    )
+  ]);
+}
+
 // Function to extract text from PDF using pdf-parse (simple, serverless-friendly)
 async function extractTextFromFile(fileUrl: string): Promise<string> {
   try {
     console.log('Extracting text from PDF file:', fileUrl);
     console.log('Using pdf-parse library...');
     
-    // Download the PDF file
+    // Download the PDF file with timeout
     console.log('Downloading PDF from URL...');
-    const response = await fetch(fileUrl);
+    const response = await withTimeout(
+      fetch(fileUrl),
+      10000, // 10 second timeout for download
+      'PDF download timed out after 10 seconds'
+    );
+    
     if (!response.ok) {
       throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
     }
 
-    const arrayBuffer = await response.arrayBuffer();
+    const arrayBuffer = await withTimeout(
+      response.arrayBuffer(),
+      5000, // 5 second timeout for buffer
+      'Failed to read PDF buffer after 5 seconds'
+    );
+    
     const buffer = Buffer.from(arrayBuffer);
     console.log(`Downloaded PDF, buffer size: ${buffer.length} bytes`);
     
@@ -98,14 +118,21 @@ async function extractTextFromFile(fileUrl: string): Promise<string> {
       throw new Error('Downloaded file is empty (0 bytes)');
     }
 
-    // Use pdf-parse - externalized in next.config.js
-    const pdfParse = require('pdf-parse/lib/pdf-parse.js');
-    
+    // Use pdf-parse with explicit import to avoid test files
     console.log('Parsing PDF with pdf-parse...');
-    const data = await pdfParse(buffer, {
-      // Options to make it work in serverless
-      max: 0, // Parse all pages
-    });
+    
+    // Import only what we need
+    const pdfParse = require('pdf-parse');
+    
+    // Parse with timeout (15 seconds max per PDF)
+    const data = await withTimeout(
+      pdfParse(buffer, {
+        max: 0, // Parse all pages
+        version: 'v2.0.550' // Specify version to avoid compatibility issues
+      }),
+      15000, // 15 second timeout for parsing
+      'PDF parsing timed out after 15 seconds'
+    );
     
     const extractedText = data.text;
     

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Maximum execution time in seconds (requires Vercel Pro)
 import { createServerSupabaseClient } from '../../../lib/supabase/server';
 import { analyzeFilesForFinancialData, FileAnalysisResult } from '../../../services/openai';
 
