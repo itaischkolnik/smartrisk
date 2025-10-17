@@ -317,7 +317,8 @@ ${extractedText}`;
           max_tokens: 500,
           response_format: { type: "json_object" }
         }),
-        20000 // 20 second timeout per file for GPT-4
+        20000, // 20 second timeout per file for GPT-4
+        'OpenAI API call timed out after 20 seconds'
       );
 
       const content = completion.choices[0]?.message?.content;
@@ -569,7 +570,8 @@ export async function generateBusinessAnalysis(data: BusinessData): Promise<Anal
         temperature: 0.5,
         max_tokens: 2500
       }),
-      120000 // 2 minutes timeout
+      120000, // 2 minutes timeout
+      'Business analysis API call timed out after 2 minutes'
     );
 
     const apiDuration = Date.now() - startTime;
