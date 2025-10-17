@@ -77,55 +77,47 @@ async function extractTextFromImagePDF(buffer: Buffer): Promise<string> {
   }
 }
 
-// Function to extract text from PDF using pdfjs-dist (externalized, no bundling)
+// Function to extract text from PDF using pdf-parse (simple, serverless-friendly)
 async function extractTextFromFile(fileUrl: string): Promise<string> {
   try {
     console.log('Extracting text from PDF file:', fileUrl);
-    console.log('Using externalized pdfjs-dist (no webpack bundling)...');
+    console.log('Using pdf-parse library...');
     
-    // With the externalized pdfjs-dist in next.config.js, this should work cleanly
-    const pdfjs = require('pdfjs-dist/legacy/build/pdf.js');
+    // Download the PDF file
+    console.log('Downloading PDF from URL...');
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    console.log(`Downloaded PDF, buffer size: ${buffer.length} bytes`);
     
-    // Disable worker completely
-    pdfjs.GlobalWorkerOptions.workerSrc = '';
+    if (buffer.length === 0) {
+      throw new Error('Downloaded file is empty (0 bytes)');
+    }
+
+    // Use pdf-parse - externalized in next.config.js
+    const pdfParse = require('pdf-parse/lib/pdf-parse.js');
     
-    console.log('Loading PDF from URL...');
-    const loadingTask = pdfjs.getDocument({
-      url: fileUrl,
-      verbosity: 0,
-      standardFontDataUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/standard_fonts/',
-      cMapUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',
-      cMapPacked: true,
+    console.log('Parsing PDF with pdf-parse...');
+    const data = await pdfParse(buffer, {
+      // Options to make it work in serverless
+      max: 0, // Parse all pages
     });
     
-    const pdf = await loadingTask.promise;
-    console.log(`✓ PDF loaded successfully. Pages: ${pdf.numPages}`);
+    const extractedText = data.text;
     
-    let fullText = '';
-    
-    // Extract text from all pages
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      try {
-        const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items
-          .map((item: any) => item.str || '')
-          .join(' ');
-        fullText += pageText + '\n';
-      } catch (pageError) {
-        console.warn(`Warning: Could not extract text from page ${pageNum}:`, pageError);
-        // Continue with other pages
-      }
-    }
-    
-    if (!fullText || fullText.trim().length === 0) {
+    if (!extractedText || extractedText.trim().length === 0) {
       throw new Error('PDF contains no extractable text. It may be an image-based scan.');
     }
     
-    console.log(`✓ Successfully extracted ${fullText.length} characters`);
-    console.log('First 200 characters:', fullText.substring(0, 200));
+    console.log(`✓ Successfully extracted ${extractedText.length} characters`);
+    console.log(`Pages: ${data.numpages}`);
+    console.log('First 200 characters:', extractedText.substring(0, 200));
     
-    return fullText;
+    return extractedText;
     
   } catch (error) {
     console.error('Error extracting text from PDF:', error);
