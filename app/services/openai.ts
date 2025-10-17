@@ -162,12 +162,14 @@ export async function analyzeFilesForFinancialData(files: any[]): Promise<FileAn
 
       let prompt = '';
       let extractedText = '';
+      
+      // Get file URL outside try block so it's accessible in the placeholder check
+      const fileUrl: string | undefined = (file as any).file_url || (file as any).url;
 
       // Extract actual text from the PDF file
       try {
         console.log(`========================================`);
         console.log(`Processing file: ${file.name} (ID: ${file.id})`);
-        const fileUrl: string | undefined = (file as any).file_url || (file as any).url;
         console.log(`File URL: ${fileUrl}`);
         console.log(`File category: ${file.category || 'unknown'}`);
         console.log(`========================================`);
