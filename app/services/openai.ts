@@ -218,7 +218,7 @@ export async function analyzeFilesForFinancialData(files: any[]): Promise<FileAn
             _fileUrl: pdfUrl,
             _fileName: file.name,
             _fileCategory: file.category
-          },
+          } as any, // Type as any since this is a custom placeholder format
           confidence: 0,
           extractedTextLength: 0,
           warnings: ['PDF text extraction skipped - file will be processed by Make.com']
