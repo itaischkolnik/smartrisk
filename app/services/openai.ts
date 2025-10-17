@@ -79,7 +79,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
   ]);
 }
 
-// Function to extract text from PDF file URL - with detailed error logging
+// Function to extract text from PDF using unpdf (serverless-friendly)
 async function extractTextFromFile(fileUrl: string): Promise<string> {
   try {
     console.log('Extracting text from PDF file:', fileUrl);
@@ -93,28 +93,29 @@ async function extractTextFromFile(fileUrl: string): Promise<string> {
     const buffer = await response.arrayBuffer();
     console.log(`Downloaded PDF, buffer size: ${buffer.byteLength} bytes`);
 
-    // Try pdf-parse with dynamic import (original working approach)
-    console.log('Attempting PDF text extraction using pdf-parse...');
+    // Use unpdf - modern, serverless-friendly PDF extractor
+    console.log('Attempting PDF text extraction using unpdf...');
     
     try {
-      // Dynamically import pdf-parse only on server side
-      const pdfParse = (await import('pdf-parse')).default;
-      console.log('pdf-parse module loaded successfully');
+      const { extractText } = await import('unpdf');
+      console.log('unpdf module loaded successfully');
       
-      const data = await pdfParse(Buffer.from(buffer));
-      console.log('pdf-parse completed successfully');
+      const { text, totalPages } = await extractText(new Uint8Array(buffer), {
+        mergePages: true, // Merge all pages into a single text
+      });
+      console.log('unpdf completed successfully');
       
-      if (data.text && data.text.trim().length > 0) {
-        console.log('Successfully extracted text using pdf-parse');
-        console.log(`Extracted ${data.text.length} characters from ${data.numpages} pages`);
-        console.log(`First 200 chars: ${data.text.substring(0, 200)}`);
-        return data.text;
+      if (text && text.trim().length > 0) {
+        console.log('Successfully extracted text using unpdf');
+        console.log(`Extracted ${text.length} characters from ${totalPages} pages`);
+        console.log(`First 200 chars: ${text.substring(0, 200)}`);
+        return text;
       } else {
         console.error('PDF parsing returned empty text');
         throw new Error('PDF appears to be empty or contains no extractable text');
       }
     } catch (parseError: any) {
-      console.error('pdf-parse failed with error:', parseError);
+      console.error('unpdf failed with error:', parseError);
       console.error('Error name:', parseError?.name);
       console.error('Error message:', parseError?.message);
       console.error('Error stack:', parseError?.stack);
