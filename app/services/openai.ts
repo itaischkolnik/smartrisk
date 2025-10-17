@@ -117,7 +117,7 @@ async function extractTextFromFile(fileUrl: string): Promise<string> {
     const pdfParse = require('pdf-parse');
     
     // Parse with timeout (15 seconds max per PDF)
-    const data = await withTimeout(
+    const data: any = await withTimeout(
       pdfParse(buffer, {
         max: 0, // Parse all pages
         version: 'v2.0.550' // Specify version to avoid compatibility issues
