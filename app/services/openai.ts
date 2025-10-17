@@ -79,7 +79,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
   ]);
 }
 
-// Function to extract text from PDF file URL - original working version
+// Function to extract text from PDF file URL - with detailed error logging
 async function extractTextFromFile(fileUrl: string): Promise<string> {
   try {
     console.log('Extracting text from PDF file:', fileUrl);
@@ -96,20 +96,34 @@ async function extractTextFromFile(fileUrl: string): Promise<string> {
     // Try pdf-parse with dynamic import (original working approach)
     console.log('Attempting PDF text extraction using pdf-parse...');
     
-    // Dynamically import pdf-parse only on server side
-    const pdfParse = (await import('pdf-parse')).default;
-    const data = await pdfParse(Buffer.from(buffer));
-    
-    if (data.text && data.text.trim().length > 0) {
-      console.log('Successfully extracted text using pdf-parse');
-      console.log(`Extracted ${data.text.length} characters from ${data.numpages} pages`);
-      return data.text;
-    } else {
-      throw new Error('PDF appears to be empty or contains no extractable text');
+    try {
+      // Dynamically import pdf-parse only on server side
+      const pdfParse = (await import('pdf-parse')).default;
+      console.log('pdf-parse module loaded successfully');
+      
+      const data = await pdfParse(Buffer.from(buffer));
+      console.log('pdf-parse completed successfully');
+      
+      if (data.text && data.text.trim().length > 0) {
+        console.log('Successfully extracted text using pdf-parse');
+        console.log(`Extracted ${data.text.length} characters from ${data.numpages} pages`);
+        console.log(`First 200 chars: ${data.text.substring(0, 200)}`);
+        return data.text;
+      } else {
+        console.error('PDF parsing returned empty text');
+        throw new Error('PDF appears to be empty or contains no extractable text');
+      }
+    } catch (parseError: any) {
+      console.error('pdf-parse failed with error:', parseError);
+      console.error('Error name:', parseError?.name);
+      console.error('Error message:', parseError?.message);
+      console.error('Error stack:', parseError?.stack);
+      throw parseError;
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error extracting text from file:', error);
-    throw new Error('Unable to extract text from PDF file. The file may be password-protected, corrupted, or contain only images. Please ensure the PDF contains readable text.');
+    const errorDetails = `${error?.name || 'Error'}: ${error?.message || 'Unknown error'}`;
+    throw new Error(`Unable to extract text from PDF file. Details: ${errorDetails}. The file may be password-protected, corrupted, or contain only images.`);
   }
 }
 
